@@ -3,8 +3,10 @@
 # Import the standard Python time functions.
 import time
 import digitalio
+import asyncio
 import board
 import cbor2
+import neopixel
 
 # Import the Adafruit Bluetooth library.  Technical reference:
 # https://circuitpython.readthedocs.io/projects/ble/en/latest/api.html
@@ -19,46 +21,64 @@ from adafruit_sht31d import SHT31D
 
 # ----------------------------------------------------------------
 # Initialize global variables for the main loop.
-ledpin= digitalio.DigitalInOut(board.BLUE_LED)
-ledpin.direction = digitalio.Direction.OUTPUT
+ledpin_blue = digitalio.DigitalInOut(board.BLUE_LED)
+ledpin_blue.direction = digitalio.Direction.OUTPUT
+
+pixel = neopixel.NeoPixel(board.NEOPIXEL, 1)
 
 i2c = board.I2C()  # uses board.SCL and board.SDA
 ble = BLERadio()
-ble.name = "Indoor/Outdoor Detector"
+ble.name = "Old Person Life Invader"
 uart = UARTService()
 advertisement = ProvideServicesAdvertisement(uart)
 
-# SHT Humidity
-humidity_sense = SHT31D(i2c)
-# BMP280 temperature and barometric pressure/altitude
-temp_barometer_sense = Adafruit_BMP280_I2C(i2c)
-# APDS9960 Proximity, Light, Color, and Gesture Sensor
-colour_sense = APDS9960(i2c)
+# check for LSM6DS33 or LSM6DS3TR-C
+try:
+    from adafruit_lsm6ds.lsm6ds33 import LSM6DS33 as LSM6DS
+    lsm6ds = LSM6DS(i2c)
+except RuntimeError:
+    from adafruit_lsm6ds.lsm6ds3 import LSM6DS3 as LSM6DS
+    lsm6ds = LSM6DS(i2c)
 
 
 # Flags for detecting state changes.
 advertised = False
 connected  = False
 
-# The sensor sampling rate is precisely regulated using the following timer variables.
-sampling_timer    = 0.0 # seconds
-last_time         = time.monotonic() # seconds
-sampling_interval = 5 * 60 # 5 minute timer
+flash_task = None
+flash_state = False
 
-# ----------------------------------------------------------------
-# Begin the main processing loop.
+async def flash_led(colour, period_s):
+    global flash_state 
+    while True:
+        flash_state = not flash_state
+        pixel[0] = colour if flash_state else (0, 0, 0)
+        await asyncio.sleep(period_s / 2)
 
+def start_flash(colour=(255,0,0), period_s=1.0):
+    global flash_task
+    if flash_task is None:
+        flash_task = asyncio.create_task(flash_led(colour, period_s))
 
+def stop_flash():
+    global flash_task
+    if flash_task:
+        flash_task.cancel()
+        try:
+            asyncio.get_event_loop().run_until_complete(flash_task)
+        except Exception:
+            pass
+        flash_task = None
+        pixel[0] = (0, 0, 0)
 
-# Set this to sea level pressure in hectoPascals at your location for accurate altitude reading.
-temp_barometer_sense.sea_level_pressure = 1013.25 # from https://learn.adafruit.com/adafruit-feather-sense/circuitpython-sense-demo
-
+# https://learn.adafruit.com/adafruit-feather-sense/circuitpython-sense-demo
 
 while True:
 
     if not advertised:
         ble.start_advertising(advertisement)
         print("Waiting for connection.")
+        start_flash((255,0,0), 5.0)
         advertised = True
         continue
         
@@ -66,91 +86,45 @@ while True:
         print("Connection lost.")
         connected = False
         advertised = False
-        ledpin.value = False # blue led off for Bluetooth disconnect
+        ledpin_blue.value = False # blue led off for Bluetooth disconnect
         continue
     
     elif not connected and ble.connected:
         print("Connection received.")
         connected = True
-        ledpin.value = True # blue led on for Bluetooth connect
+        stop_flash()
+        ledpin_blue.value = True # blue led on for Bluetooth connect
+    
+    elif not connected:
+        continue 
+
+    # Accelerometer and Gyro
+    accel_x = lsm6ds.acceleration[0]
+    accel_y = lsm6ds.acceleration[1]
+    accel_z = lsm6ds.acceleration[2]
+    
+    gyro_x = lsm6ds.gyro[0]
+    gyro_y = lsm6ds.gyro[1]
+    gyro_z = lsm6ds.gyro[2]
 
 
-    now = time.monotonic()
-    interval = now - last_time
-    last_time = now
-    sampling_timer -= interval
+    pack = SenmlPack("feathersense")
+    pack.base_time = time.time() 
 
-    if sampling_timer < 0.0:
-        sampling_timer += sampling_interval
+    # Acceleration
+    pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
+    pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
+    pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
 
-        # Read sensors
-        temperature = temp_barometer_sense.temperature   # °C
-        pressure = temp_barometer_sense.pressure         # hPa
-        altitude = temp_barometer_sense.altitude         # m
-        humidity = humidity_sense.relative_humidity      # %
+    pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
+    pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
+    pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
 
-        colour_sense.enable_color = True
-        colour_sense.enable_proximity = True
-        r, g, b, c = colour_sense.color_data
-        proximity = colour_sense.proximity
-        colour_sense.enable_color = False
-        colour_sense.enable_proximity = False
-
-        # approximate lux
-        ambient_lux = (0.299 * r + 0.587 * g + 0.114 * b)  # lux
-
-        pack = SenmlPack("feathersense")
-        pack.base_time = time.time() 
-
-        # Temperature
-        rec_temp = SenmlRecord("temperature")
-        rec_temp.value = temperature
-        rec_temp.unit = "Cel"
-        pack.add(rec_temp)
-
-        # Pressure
-        rec_pres = SenmlRecord("pressure")
-        rec_pres.value = pressure
-        rec_pres.unit = "hPa"
-        pack.add(rec_pres)
-
-        # Altitude
-        rec_alt = SenmlRecord("altitude")
-        rec_alt.value = altitude
-        rec_alt.unit = "m"
-        pack.add(rec_alt)
-
-        # Humidity
-        rec_hum = SenmlRecord("humidity")
-        rec_hum.value = humidity
-        rec_hum.unit = "%RH"
-        pack.add(rec_hum)
-
-        # Light / colour
-        rec_lux = SenmlRecord("light_lux")
-        rec_lux.value = ambient_lux
-        rec_lux.unit = "lux"
-        pack.add(rec_lux)
-
-        rec_r = SenmlRecord("color_r")
-        rec_r.value = r
-        pack.add(rec_r)
-
-        rec_g = SenmlRecord("color_g")
-        rec_g.value = g
-        pack.add(rec_g)
-
-        rec_b = SenmlRecord("color_b")
-        rec_b.value = b
-        pack.add(rec_b)
-
-        rec_c = SenmlRecord("color_c")
-        rec_c.value = c
-        pack.add(rec_c)
-
-        # payload = pack.to_json().encode("utf-8")
-        payload = pack.to_cbor()
-        print(payload)
-        
-        if connected:
-            uart.write(payload + b"\n")
+    # payload = pack.to_json().encode("utf-8")
+    payload = pack.to_cbor()
+    print(payload)
+    
+    if connected:
+        uart.write(payload + b"\n")
+    else:
+        print("Not Connected")
