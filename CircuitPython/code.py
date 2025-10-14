@@ -6,7 +6,6 @@ import digitalio
 import asyncio
 import board
 import cbor2
-import neopixel
 
 # Import the Adafruit Bluetooth library.  Technical reference:
 # https://circuitpython.readthedocs.io/projects/ble/en/latest/api.html
@@ -24,7 +23,9 @@ from adafruit_sht31d import SHT31D
 ledpin_blue = digitalio.DigitalInOut(board.BLUE_LED)
 ledpin_blue.direction = digitalio.Direction.OUTPUT
 
-pixel = neopixel.NeoPixel(board.NEOPIXEL, 1)
+ledpin_red = digitalio.DigitalInOut(board.RED_LED)
+ledpin_red.direction = digitalio.Direction.OUTPUT
+
 
 i2c = board.I2C()  # uses board.SCL and board.SDA
 ble = BLERadio()
@@ -45,32 +46,6 @@ except RuntimeError:
 advertised = False
 connected  = False
 
-flash_task = None
-flash_state = False
-
-async def flash_led(colour, period_s):
-    global flash_state 
-    while True:
-        flash_state = not flash_state
-        pixel[0] = colour if flash_state else (0, 0, 0)
-        await asyncio.sleep(period_s / 2)
-
-def start_flash(colour=(255,0,0), period_s=1.0):
-    global flash_task
-    if flash_task is None:
-        flash_task = asyncio.create_task(flash_led(colour, period_s))
-
-def stop_flash():
-    global flash_task
-    if flash_task:
-        flash_task.cancel()
-        try:
-            asyncio.get_event_loop().run_until_complete(flash_task)
-        except Exception:
-            pass
-        flash_task = None
-        pixel[0] = (0, 0, 0)
-
 # https://learn.adafruit.com/adafruit-feather-sense/circuitpython-sense-demo
 
 while True:
@@ -78,21 +53,22 @@ while True:
     if not advertised:
         ble.start_advertising(advertisement)
         print("Waiting for connection.")
-        start_flash((255,0,0), 5.0)
         advertised = True
+        ledpin_red.value = True
         continue
         
     elif connected and not ble.connected:
         print("Connection lost.")
         connected = False
         advertised = False
+        ledpin_red.value = True
         ledpin_blue.value = False # blue led off for Bluetooth disconnect
         continue
     
     elif not connected and ble.connected:
         print("Connection received.")
         connected = True
-        stop_flash()
+        ledpin_red.value = False
         ledpin_blue.value = True # blue led on for Bluetooth connect
     
     elif not connected:
