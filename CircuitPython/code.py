@@ -46,61 +46,66 @@ except RuntimeError:
 advertised = False
 connected  = False
 
+
+neopixel_pin = board.NEOPIXEL
+
 # https://learn.adafruit.com/adafruit-feather-sense/circuitpython-sense-demo
 
-while True:
+async def main():
 
-    if not advertised:
-        ble.start_advertising(advertisement)
-        print("Waiting for connection.")
-        advertised = True
-        ledpin_red.value = True
-        continue
+    while True:
+
+        if not advertised:
+            ble.start_advertising(advertisement)
+            print("Waiting for connection.")
+            advertised = True
+            ledpin_red.value = True
+            continue
+            
+        elif connected and not ble.connected:
+            print("Connection lost.")
+            connected = False
+            advertised = False
+            ledpin_red.value = True
+            ledpin_blue.value = False # blue led off for Bluetooth disconnect
+            continue
         
-    elif connected and not ble.connected:
-        print("Connection lost.")
-        connected = False
-        advertised = False
-        ledpin_red.value = True
-        ledpin_blue.value = False # blue led off for Bluetooth disconnect
-        continue
-    
-    elif not connected and ble.connected:
-        print("Connection received.")
-        connected = True
-        ledpin_red.value = False
-        ledpin_blue.value = True # blue led on for Bluetooth connect
-    
-    elif not connected:
-        continue 
+        elif not connected and ble.connected:
+            print("Connection received.")
+            connected = True
+            ledpin_red.value = False
+            ledpin_blue.value = True # blue led on for Bluetooth connect
+        
+        elif not connected:
+            continue 
 
-    # Accelerometer and Gyro
-    accel_x = lsm6ds.acceleration[0]
-    accel_y = lsm6ds.acceleration[1]
-    accel_z = lsm6ds.acceleration[2]
-    
-    gyro_x = lsm6ds.gyro[0]
-    gyro_y = lsm6ds.gyro[1]
-    gyro_z = lsm6ds.gyro[2]
+        # Accelerometer and Gyro
+        accel_x = lsm6ds.acceleration[0]
+        accel_y = lsm6ds.acceleration[1]
+        accel_z = lsm6ds.acceleration[2]
+        
+        gyro_x = lsm6ds.gyro[0]
+        gyro_y = lsm6ds.gyro[1]
+        gyro_z = lsm6ds.gyro[2]
 
 
-    pack = SenmlPack("feathersense")
-    pack.base_time = time.time() 
+        pack = SenmlPack("feathersense")
+        pack.base_time = time.time() 
 
-    # Acceleration
-    pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
-    pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
-    pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
+        # Acceleration
+        pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
+        pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
+        pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
 
-    pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
-    pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
-    pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
+        pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
+        pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
+        pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
 
-    # payload = pack.to_json().encode("utf-8")
-    payload = pack.to_cbor()
-    print(payload)
-    
-    if connected:
-        uart.write(payload + b"\n")
-    else:
-        print("Not Connected")
+        # payload = pack.to_json().encode("utf-8")
+        payload = pack.to_cbor()
+        print(payload)
+        
+        if connected:
+            uart.write(payload + b"\n")
+        else:
+            print("Not Connected")
