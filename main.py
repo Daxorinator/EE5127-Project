@@ -2,21 +2,18 @@ import asyncio
 import struct
 from bleak import BleakScanner, BleakClient
 
-# UUIDs must match the ones you defined in your peripheral code
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 CHAR_UUID    = "12345678-1234-5678-1234-56789abcdef1"
 
 def handle_notification(_, data: bytearray):
-    """Callback for received accel_x float packets"""
     try:
-        # Unpack little-endian float
-        (accel_x,) = struct.unpack("<f", data)
-        print(f"Accel X: {accel_x:.3f} m/s^2")
+        ax, ay, az, gx, gy, gz = struct.unpack("<ffffff", data)
+        print(f"Accel (m/s^2): x={ax:.2f}, y={ay:.2f}, z={az:.2f} | "
+              f"Gyro (dps): x={gx:.2f}, y={gy:.2f}, z={gz:.2f}")
     except Exception as e:
         print(f"Decode error: {e}")
 
 async def main():
-    # Scan for your device
     print("Scanning for BLE devices...")
     devices = await BleakScanner.discover(timeout=5.0)
 
@@ -31,14 +28,11 @@ async def main():
         print("Peripheral not found!")
         return
 
-    # Connect and subscribe
     async with BleakClient(target.address) as client:
         print("Connected to", target.name)
-
-        # Subscribe to notifications
         await client.start_notify(CHAR_UUID, handle_notification)
 
-        print("Subscribed to accel_x data. Listening (Ctrl+C to quit)...")
+        print("Subscribed to accel+gyro data. Listening (Ctrl+C to quit)...")
         try:
             while True:
                 await asyncio.sleep(1.0)
@@ -49,3 +43,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
