@@ -102,5 +102,4 @@ while True:
     
     if connected:
         uart.write(payload + b"\n")
-    else:
-        print("Not Connected")
+    time.sleep(0.1)
