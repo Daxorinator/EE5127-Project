@@ -1,7 +1,7 @@
-import asyncio
-import logging
+import asyncio, io, logging
+from pyclbr import Function
 from cust_cbor_decode import decode_stream
-from cbor2 import loads
+from cbor2 import loads, CBORDecoder, CBORDecodeError
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
@@ -30,22 +30,38 @@ def find_feather_sense():
 
         logger.info("Device not found, retrying scan...")
 
+def decode_stream(stream, callback):
+
+    buffer = io.BytesIO()
+    decoder = CBORDecoder(buffer)
+
+    for chunk in stream:
+        pos = buffer.tell() # save current buffer position
+        buffer.seek(0, io.SEEK_END) # move to end of buffer
+        buffer.write(chunk) # write new chunk
+        buffer.seek(pos) # restore position
+
+        while True: # The buffer could contain multiple CBOR objects so keep going until there's an error
+            try:
+                obj = decoder.decode()
+                callback(obj)
+            except CBORDecodeError:
+                break # Not enough data to decode, wait for more
+        
+        # Compact the buffer
+        remaining = buffer.read()
+        buffer.seek(0)
+        buffer.truncate(0)
+        buffer.write(remaining)
+        buffer.seek(0)
+
 async def main():
-    global buffer
     try:
         device = find_feather_sense()
         uart = device[UARTService]
         while device.connected:
-            chunk = uart.read()
-            if not chunk:
-                continue
-            buffer.extend(chunk)
-            try:
-                decoded, buffer = decode_stream(buffer)
-                for obj in decoded:
-                    logger.info(f"Received: {obj}")
-            except Exception as e:
-                logger.error(f"Error decoding CBOR: {e}")            # await asyncio.sleep(1)
+            data = uart.read(64)
+            decode_stream(data, lambda obj: logger.info(f"Received: {obj}"))
 
     except KeyboardInterrupt:
         logger.info("User interrupted. Shutting down...")

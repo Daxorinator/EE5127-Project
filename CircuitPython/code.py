@@ -82,26 +82,8 @@ while True:
     gyro_x = lsm6ds.gyro[0]
     gyro_y = lsm6ds.gyro[1]
     gyro_z = lsm6ds.gyro[2]
-
-
-    #pack = SenmlPack("feathersense")
-    #pack.base_time = time.time() 
-
-    # Acceleration
-    # pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
-    # pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
-    # pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
-
-    # pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
-    # pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
-    # pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
-
-    # payload = pack.to_json().encode("utf-8")
-    # payload = pack.to_cbor()
     
     payload_dict = {
-        "device": "feathersense",
-        "timestamp": time.time(),
         "accel": {
             "x": accel_x,
             "y": accel_y,
@@ -119,5 +101,5 @@ while True:
     payload = cbor2.dumps(payload_dict)
 
     if connected:
-        uart.write(payload) # + b"\n")
-    time.sleep(0.1)
+        uart.write(payload)
+    time.sleep(0.01)
