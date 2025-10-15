@@ -1,6 +1,4 @@
 import asyncio, io, logging
-from pyclbr import Function
-from cust_cbor_decode import decode_stream
 from cbor2 import loads, CBORDecoder, CBORDecodeError
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
