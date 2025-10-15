@@ -50,7 +50,7 @@ while True:
         led.set_color((255, 0, 0))
 
     while ble.connected:
-        led.set_color(0, 255, 0)
+        led.set_color((0, 255, 0))
         t0 = time.monotonic()
 
         # Read accel + gyro
