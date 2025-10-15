@@ -1,5 +1,7 @@
 import asyncio
 import struct
+import io
+import logging
 from bleak import BleakScanner, BleakClient
 
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
@@ -20,7 +22,7 @@ async def main():
     target = None
     for d in devices:
         print(f"Found {d.name} ({d.address})")
-        if d.name and "Old Person Life Betterer" in d.name:
+        if d.name and "Old Person Life Invader" in d.name:
             target = d
             break
 

@@ -1,6 +1,8 @@
 import struct
 import time
+from async_status import LEDController
 import board
+import asyncio
 
 from adafruit_ble import BLERadio
 from adafruit_lsm6ds import Rate
@@ -30,6 +32,10 @@ except RuntimeError:
 lsm6ds.accelerometer_data_rate = Rate.RATE_52_HZ
 lsm6ds.gyro_data_rate = Rate.RATE_52_HZ
 
+led = LEDController()
+blink_task = asyncio.create_task(led.blink())
+
+
 ble = BLERadio()
 ble.name = "Old Person Life Betterer"
 sensor_service = SensorService()
@@ -41,9 +47,10 @@ while True:
     print("Starting the old person life betterer")
     ble.start_advertising(advertisement)
     while not ble.connected:
-        pass
+        led.set_color((255, 0, 0))
 
     while ble.connected:
+        led.set_color(0, 255, 0)
         t0 = time.monotonic()
 
         # Read accel + gyro
@@ -64,4 +71,3 @@ while True:
         dt = time.monotonic() - t0
         if dt < target_dt:
             time.sleep(target_dt - dt)
-
