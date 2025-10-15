@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from cust_senml_decode import decode_senml_cbor
+from cust_cbor_decode import decode_stream
 from cbor2 import loads
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
@@ -40,16 +40,12 @@ async def main():
             if not chunk:
                 continue
             buffer.extend(chunk)
-
             try:
-                while b"\n" in buffer:
-                    msg, _, buffer = buffer.partition(b"\n")
-                    logger.info(f"Raw data: {msg}")
-                    cbor = decode_senml_cbor(msg)
-                    logger.info(f"Received: {cbor}")
+                decoded, buffer = decode_stream(buffer)
+                for obj in decoded:
+                    logger.info(f"Received: {obj}")
             except Exception as e:
-                print(f"Had an error decoding: {e}")
-            # await asyncio.sleep(1)
+                logger.error(f"Error decoding CBOR: {e}")            # await asyncio.sleep(1)
 
     except KeyboardInterrupt:
         logger.info("User interrupted. Shutting down...")

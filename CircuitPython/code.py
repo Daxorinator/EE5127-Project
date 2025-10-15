@@ -12,8 +12,8 @@ import cbor2
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
-from senml.senml_pack import SenmlPack
-from senml.senml_record import SenmlRecord
+# from senml.senml_pack import SenmlPack
+# from senml.senml_record import SenmlRecord
 from adafruit_apds9960.apds9960 import APDS9960
 from adafruit_bmp280 import Adafruit_BMP280_I2C
 from adafruit_sht31d import SHT31D
@@ -84,22 +84,40 @@ while True:
     gyro_z = lsm6ds.gyro[2]
 
 
-    pack = SenmlPack("feathersense")
-    pack.base_time = time.time() 
+    #pack = SenmlPack("feathersense")
+    #pack.base_time = time.time() 
 
     # Acceleration
-    pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
-    pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
-    pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
+    # pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
+    # pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
+    # pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
 
-    pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
-    pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
-    pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
+    # pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
+    # pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
+    # pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
 
     # payload = pack.to_json().encode("utf-8")
-    payload = pack.to_cbor()
-    print(payload)
+    # payload = pack.to_cbor()
     
+    payload_dict = {
+        "device": "feathersense",
+        "timestamp": time.time(),
+        "accel": {
+            "x": accel_x,
+            "y": accel_y,
+            "z": accel_z,
+            "unit": "m/s2",
+        },
+        "gyro": {
+            "x": gyro_x,
+            "y": gyro_y,
+            "z": gyro_z,
+            "unit": "deg/s",
+        }
+    }
+
+    payload = cbor2.dumps(payload_dict)
+
     if connected:
-        uart.write(payload + b"\n")
+        uart.write(payload) # + b"\n")
     time.sleep(0.1)
