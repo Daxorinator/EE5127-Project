@@ -1,55 +1,51 @@
 import asyncio
-import logging
-from cust_cbor_decode import decode_stream
-from cbor2 import loads
-from adafruit_ble import BLERadio
-from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
-from adafruit_ble.services.nordic import UARTService
+import struct
+from bleak import BleakScanner, BleakClient
 
-# Feather Sense BLE settings
-DEVICE_NAME = "Old Person Life Invader"  # Change this to match your device's advertised name
+# UUIDs must match the ones you defined in your peripheral code
+SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
+CHAR_UUID    = "12345678-1234-5678-1234-56789abcdef1"
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-ble = BLERadio()
-
-buffer = bytearray()
-
-def find_feather_sense():
-    """Scan for the Feather Sense device"""
-    logger.info("Scanning for Feather Sense...")
-    
-    while True:
-        for adv in ble.start_scan(ProvideServicesAdvertisement, timeout=10):
-            if (adv.complete_name == DEVICE_NAME) and (UARTService in adv.services):
-                logger.info(f"Found device: {adv.complete_name} at {adv.address}")
-                ble.stop_scan()
-                return ble.connect(adv)
-
-        logger.info("Device not found, retrying scan...")
+def handle_notification(_, data: bytearray):
+    """Callback for received accel_x float packets"""
+    try:
+        # Unpack little-endian float
+        (accel_x,) = struct.unpack("<f", data)
+        print(f"Accel X: {accel_x:.3f} m/s^2")
+    except Exception as e:
+        print(f"Decode error: {e}")
 
 async def main():
-    global buffer
-    try:
-        device = find_feather_sense()
-        uart = device[UARTService]
-        while device.connected:
-            chunk = uart.read()
-            if not chunk:
-                continue
-            buffer.extend(chunk)
-            try:
-                decoded, buffer = decode_stream(buffer)
-                for obj in decoded:
-                    logger.info(f"Received: {obj}")
-            except Exception as e:
-                logger.error(f"Error decoding CBOR: {e}")            # await asyncio.sleep(1)
+    # Scan for your device
+    print("Scanning for BLE devices...")
+    devices = await BleakScanner.discover(timeout=5.0)
 
-    except KeyboardInterrupt:
-        logger.info("User interrupted. Shutting down...")
+    target = None
+    for d in devices:
+        print(f"Found {d.name} ({d.address})")
+        if d.name and "Old Person Life Betterer" in d.name:
+            target = d
+            break
+
+    if not target:
+        print("Peripheral not found!")
+        return
+
+    # Connect and subscribe
+    async with BleakClient(target.address) as client:
+        print("Connected to", target.name)
+
+        # Subscribe to notifications
+        await client.start_notify(CHAR_UUID, handle_notification)
+
+        print("Subscribed to accel_x data. Listening (Ctrl+C to quit)...")
+        try:
+            while True:
+                await asyncio.sleep(1.0)
+        except KeyboardInterrupt:
+            print("Disconnecting...")
+        finally:
+            await client.stop_notify(CHAR_UUID)
 
 if __name__ == "__main__":
-    # Run the async main function
     asyncio.run(main())

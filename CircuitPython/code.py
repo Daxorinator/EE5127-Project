@@ -1,14 +1,11 @@
-# Provide a remote sensing service over Bluetooth Low-Energy (BLE).
-# ----------------------------------------------------------------
-# Import the standard Python time functions.
+from adafruit_ble.services import Service
+from adafruit_ble.characteristics import Characteristic
+from adafruit_ble.uuid import VendorUUID
 import time
-import digitalio
-import asyncio
+from cbor2 import dumps
 import board
-import cbor2
+import struct
 
-# Import the Adafruit Bluetooth library.  Technical reference:
-# https://circuitpython.readthedocs.io/projects/ble/en/latest/api.html
 from adafruit_ble import BLERadio
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services.nordic import UARTService
@@ -18,20 +15,20 @@ from adafruit_apds9960.apds9960 import APDS9960
 from adafruit_bmp280 import Adafruit_BMP280_I2C
 from adafruit_sht31d import SHT31D
 
-# ----------------------------------------------------------------
-# Initialize global variables for the main loop.
-ledpin_blue = digitalio.DigitalInOut(board.BLUE_LED)
-ledpin_blue.direction = digitalio.Direction.OUTPUT
 
-ledpin_red = digitalio.DigitalInOut(board.RED_LED)
-ledpin_red.direction = digitalio.Direction.OUTPUT
-
+class SensorService(Service):
+    uuid = VendorUUID("12345678-1234-5678-1234-56789abcdef0")  # random UUID
+    sensor_data = Characteristic(
+        uuid=VendorUUID("12345678-1234-5678-1234-56789abcdef1"),
+        properties=Characteristic.NOTIFY,
+        max_length=128
+    )
 
 i2c = board.I2C()  # uses board.SCL and board.SDA
 ble = BLERadio()
-ble.name = "Old Person Life Invader"
-uart = UARTService()
-advertisement = ProvideServicesAdvertisement(uart)
+ble.name = "Old Person Life Betterer"
+sensor_service = SensorService()
+advertisement = ProvideServicesAdvertisement(sensor_service)
 
 # check for LSM6DS33 or LSM6DS3TR-C
 try:
@@ -42,81 +39,29 @@ except RuntimeError:
     lsm6ds = LSM6DS(i2c)
 
 
-# Flags for detecting state changes.
-advertised = False
-connected  = False
-
-# https://learn.adafruit.com/adafruit-feather-sense/circuitpython-sense-demo
+target_dt = 1.0/50.0
 
 while True:
+    print("Starting the old person life betterer")
+    ble.start_advertising(advertisement)
+    while not ble.connected:
+        pass
 
-    if not advertised:
-        ble.start_advertising(advertisement)
-        print("Waiting for connection.")
-        advertised = True
-        ledpin_red.value = True
-        continue
-        
-    elif connected and not ble.connected:
-        print("Connection lost.")
-        connected = False
-        advertised = False
-        ledpin_red.value = True
-        ledpin_blue.value = False # blue led off for Bluetooth disconnect
-        continue
-    
-    elif not connected and ble.connected:
-        print("Connection received.")
-        connected = True
-        ledpin_red.value = False
-        ledpin_blue.value = True # blue led on for Bluetooth connect
-    
-    elif not connected:
-        continue 
+    while ble.connected:
+        t0 = time.monotonic()
 
-    # Accelerometer and Gyro
-    accel_x = lsm6ds.acceleration[0]
-    accel_y = lsm6ds.acceleration[1]
-    accel_z = lsm6ds.acceleration[2]
-    
-    gyro_x = lsm6ds.gyro[0]
-    gyro_y = lsm6ds.gyro[1]
-    gyro_z = lsm6ds.gyro[2]
+        # Read accel x
+        accel_x = lsm6ds.acceleration[0]  # just X axis
 
+        # Convert float -> 4-byte little-endian binary
+        payload = struct.pack("<f", accel_x)
 
-    #pack = SenmlPack("feathersense")
-    #pack.base_time = time.time() 
+        try:
+            sensor_service.sensor_data = payload
+        except Exception:
+            pass
 
-    # Acceleration
-    # pack.add(SenmlRecord("accel_x", value=accel_x, unit="m/s2"))
-    # pack.add(SenmlRecord("accel_y", value=accel_y, unit="m/s2"))
-    # pack.add(SenmlRecord("accel_z", value=accel_z, unit="m/s2"))
-
-    # pack.add(SenmlRecord("gyro_x", value=gyro_x, unit="deg/s"))
-    # pack.add(SenmlRecord("gyro_y", value=gyro_y, unit="deg/s"))
-    # pack.add(SenmlRecord("gyro_z", value=gyro_z, unit="deg/s"))
-
-    # payload = pack.to_json().encode("utf-8")
-    # payload = pack.to_cbor()
-    
-    payload_dict = {
-        "device": "feathersense",
-        "timestamp": time.time(),
-        "accel": {
-            "x": accel_x,
-            "y": accel_y,
-            "z": accel_z,
-            "unit": "m/s2",
-        },
-        "gyro": {
-            "x": gyro_x,
-            "y": gyro_y,
-            "z": gyro_z,
-            "unit": "deg/s",
-        }
-    }
-
-    payload = cbor2.dumps(payload_dict)
-
-    if connected:
-        uart.write(payload) # + b"\n")
+        # maintain ~50 Hz
+        dt = time.monotonic() - t0
+        if dt < target_dt:
+            time.sleep(target_dt - dt)
