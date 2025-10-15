@@ -120,4 +120,3 @@ while True:
 
     if connected:
         uart.write(payload) # + b"\n")
-    time.sleep(0.1)
