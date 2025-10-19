@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2026/dev/Arch Linux) (preloaded format=pdflatex 2025.10.9)  17 OCT 2025 18:43
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2026/dev/Arch Linux) (preloaded format=pdflatex 2025.10.9)  19 OCT 2025 17:33
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -326,22 +326,6 @@ LaTeX Font Info:    Trying to load font information for U+msb on input line 35.
 (/usr/share/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-Underfull \hbox (badness 3471) in paragraph at lines 67--68
-[]\OT1/ptm/m/n/10 Sensor Node (Feath-ersense: ac-celerom-e-ter, gy-ro-scope,
- []
-
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 80.
-LaTeX Info: Symbol \textrightarrow not provided by
-            font family ptm in TS1 encoding.
-            Default family used instead on input line 80.
-
-
-
-Underfull \hbox (badness 2318) in paragraph at lines 97--98
-[]\OT1/ptm/m/n/10 BLE GATT (jus-ti-fi-ca-tion: faster, lightweight vs BLE
- []
 
 
 
@@ -349,7 +333,75 @@ Underfull \hbox (badness 2318) in paragraph at lines 97--98
 ts/enc/dvips/base/8r.enc}
 
 
-{/usr/share/texmf-dist/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
+]
+
+
+
+[2]
+Underfull \hbox (badness 10000) in paragraph at lines 200--201
+[]\OT1/ptm/m/n/8 Health Ser-vice Ex-ec-u-tive (HSE), ``Se-niors Alert Scheme,''
+
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 200--201
+\OT1/ptm/m/it/8 Health Ser-vice Ex-ec-u-tive\OT1/ptm/m/n/8 , 2024. [On-line]. A
+vail-able:
+ []
+
+
+Overfull \hbox (15.23659pt too wide) in paragraph at lines 200--201
+\OT1/ptm/m/n/8 https://www.hse.ie/eng/services/list/4/olderpeople/carersrelativ
+es/community-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 206--208
+[]\OT1/ptm/m/n/8 E. Mal-one, ``Staff short-ages and pub-lic per-cep-tion lead-i
+ng
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 206--208
+\OT1/ptm/m/n/8 to health-care worker burnout, F[]orsa re-search sug-gests,''
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 206--208
+\OT1/ptm/m/it/8 The Irish Times\OT1/ptm/m/n/8 , May 15, 2025. [On-line]. Avail-
+able:
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 206--208
+\OT1/ptm/m/n/8 https://www.irishtimes.com/health/2025/05/15/healthcare-burnout-
+
+ []
+
+
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 217--218
+\OT1/ptm/m/n/8 [On-line]. Avail-able: https://learn.adafruit.com/adafruit-feath
+er-
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 219--222
+[]\OT1/ptm/m/n/8 Maker Ad-vi-sor, ``ESP32 De-vel-op-ment Boards Re-view and
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 219--222
+\OT1/ptm/m/n/8 Com-par-i-son,'' \OT1/ptm/m/it/8 Maker Ad-vi-sor\OT1/ptm/m/n/8 ,
+ 2023. [On-line]. Avail-able:
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 219--222
+\OT1/ptm/m/n/8 https://makeradvisor.com/esp32-development-boards-review-
+ []
+
 
 ** Conference Paper **
 Before submitting the final camera ready copy, remember to:
@@ -363,32 +415,31 @@ Before submitting the final camera ready copy, remember to:
 
 
 
-
-
-[2
-
-] (./SK_SK_EE5127_report.aux)
+[3] (./SK_SK_EE5127_report.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 4181 strings out of 475171
- 63280 string characters out of 5767095
- 461573 words of memory out of 5000000
- 27145 multiletter control sequences out of 15000+600000
- 593912 words of font info for 102 fonts, out of 8000000 for 9000
+ 4190 strings out of 475171
+ 63446 string characters out of 5767095
+ 466590 words of memory out of 5000000
+ 27153 multiletter control sequences out of 15000+600000
+ 597952 words of font info for 109 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 57i,8n,65p,341b,266s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/share/texmf-dist/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/t
-exmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texmf-dist/fonts/type1/u
-rw/times/utmbi8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></
-usr/share/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
-Output written on SK_SK_EE5127_report.pdf (2 pages, 66892 bytes).
+ 57i,8n,65p,966b,266s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/
+texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texmf-dist/font
+s/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texmf-dist/fonts/type1/public/a
+msfonts/cm/cmsy10.pfb></usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cms
+y7.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texm
+f-dist/fonts/type1/urw/times/utmbi8a.pfb></usr/share/texmf-dist/fonts/type1/urw
+/times/utmr8a.pfb></usr/share/texmf-dist/fonts/type1/urw/times/utmri8a.pfb>
+Output written on SK_SK_EE5127_report.pdf (3 pages, 115281 bytes).
 PDF statistics:
- 38 PDF objects out of 1000 (max. 8388607)
- 23 compressed objects within 1 object stream
+ 60 PDF objects out of 1000 (max. 8388607)
+ 36 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 
