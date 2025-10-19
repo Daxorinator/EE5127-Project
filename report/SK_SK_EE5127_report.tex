@@ -42,86 +42,126 @@ component, formatting, style, styling, insert.
 \end{IEEEkeywords}
 
 \section{Introduction}
-Blah Blah
+
 
 \subsection{Problem Statement}
-Statement
 
-\subsection{Need for IoT system}
-Wearable sensors and cloud integration enables scalable real time monitoring.
+\subsubsection{Current Situation}
+Real-time monitoring of human activity has valuable applications in healthcare, helping to improve patient care, reduce the workload on healthcare staff, and lower costs while enhancing quality of life \cite{b1}. 
 
+\subsubsection{Need for IoT System}
+Despite this potential, many current monitoring solutions remain limited. Systems such as pendant alarms, deployed through initiatives like the Seniors Alert Scheme, require manual activation by the user in the event of a fall \cite{b2}. This dependency on user input makes them less reliable in emergency situations. Automatic fall detection systems still face challenges with false alarms and missed detections. One study reported that an accelerometer based prototype detected only 80\% of real world falls, with false alarms occurring approximately once every 40 hours of use \cite{b3}. These technological limitations are compounded by staff shortages in the health and social care sector, which place additional strain on staff morale and reduce care quality \cite{b4}. As a whole these factors show that there is a need for better IoT based solutions that can provide continuous, accurate, and scalable monitoring.
 
-\subsection{Aim and Objectives}\label{AA}
-Acquire inertial data (accel + gyro) using Feathersense board.
+\subsubsection{Aim and Objectives}\label{AO}
+The aim of this project is to design and implement an IoT system for activity monitoring using inertial sensors. The objectives are to:
+\begin{itemize}
+	\item Acquire accelerometer and gyroscope data using a Feathersense board.
+	\item Transmit sensor data in real time via BLE to an IoT gateway.
+	\item Perform preprocessing at the gateway, including feature extraction (e.g. jerk, magnitude).
+	\item Prepare the data pipeline for integration with machine learning models as part of Deliverable II.
+\end{itemize}
 
-Transmit via BLE to IoT gateway.
-
-Perform preprocessing (feature extraction: jerk, magnitude, etc.) at the gateway.
-
-Prepare pipeline for ML in Deliverable II.
 
 \section{System Design}
 
-
 \subsection{Block diagram of the IoT system}
-Sensor Node (Feathersense: accelerometer, gyroscope, BLE)
+The overall architecture of the IoT system is illustrated in Fig.~\ref{fig:block_diagram}. 
+\begin{figure}[h]
+	\centering
+	% \includegraphics[width=0.45\textwidth]{figures/block_diagram.png}
+	\caption{Block diagram of the IoT system, showing the layered design from sensing to cloud integration.}
+	\label{fig:block_diagram}
+\end{figure}
 
-Communication layer (BLE GATT protocol)
 
-IoT Gateway (Raspberry Pi 4, receiving, preprocessing, visualization)
-
-Cloud platform (for future phases, just note it)
-
+\textbf{[TODO: Put block diagram figure here.]} 
 
 \subsection{Simplified IoT architecture}
 
-Perception Layer – Feathersense (sensors)
+The IoT system follows a layered architecture. At the perception layer, the FeatherSense board captures motion data from its built-in accelerometer and gyroscope. This data is transmitted via the communication layer, using the BLE GATT protocol, to the IoT gateway (Raspberry Pi 4). The gateway performs preprocessing of the data streams. 
 
-Network Layer – BLE (UART attempt → too slow, GATT → selected)
+\textbf{[@Sean: maybe put in a sentence here about what is done there, very brief of course.]} 
 
-Edge Layer – Raspberry Pi (data reception, feature computation: jerk, orientation, etc.)
+For Deliverable I, cloud integration is not implemented. However, the block design includes a future planned cloud layer for storage, machine learning, and analytics.
 
-Application Layer – For Deliverable I: visualization, plots. For future: ML in cloud.
 
 
 \section{Component Selections}\label{CS}
 
 \subsection{Sensor Node}\label{SN}
-Feathersense board (justification: built-in accel/gyro, BLE support, low-power).
+The Adafruit FeatherSense nRF52840\cite{b7} was provided as the designated sensor node. This board integrates multiple sensors (e.g., accelerometer/gyroscope, magnetometer, microphone, temperature, humidity, and pressure sensors) along with native BLE support. For this project, only the accelerometer and gyroscope were used, as these correspond directly with the HARTH dataset \cite{b5,b6} chosen for activity recognition. The other onboard sensors were not relevant to the project aims and were therefore excluded.
+
+Although platforms like the Espressif ESP32 DecKitC are used widely in other IoT projects, offering Wi-Fi and BLE connectivity \cite{b8}, they typically require an external intertial measurement unit (IMU) if accelerometer or gyroscope sensing is needed. This comes with an increased cost, complexity and board count. The FeatherSense nRF52840 on the other hand comes with an integrated LSM6DS3 IMU, native BLE, and USB \& Batter charging support in one package. This makes it more suitable for the project's requirements for a self contained inertial sensor node.
+
 
 \subsection{Gateway}\label{GW}
-Raspberry Pi 4 (justification: computing capacity, BLE support, Python libraries).
-
+The Raspberry Pi 4 served as the IoT gateway. This device was issued for this project, and it has the sufficient computing capacity, integrated BLE support, and compatibility with Python's data acquisition and processing libraries. 
+\textbf{[@Sean: again, if you want to add anything here. I think from the brief maybe we do need to do some comparison, like what I did inthe last paragraph]} 
 
 \subsection{Communication}\label{COM}
-BLE GATT (justification: faster, lightweight vs BLE UART).
+BLE was the protocol used, as it is the only wireless option natively supported by the FeatherSense nRF52840 board. An initial implementation used BLE UART with CBOR encoding. However this was too slow. To meet the 50~Hz sampling target, the system was reimplemented using BLE GATT, transmitting fixed length packets of six floating point values. This achieved stable operation at the required frequency.
 
 \subsection{Power}
-(Feathersense USB/battery powered, mention suitability for prototyping).
+For prototyping, the FeatherSense was powered via USB, which ensured stability and ease of development. The board supports battery operation, but this was not implemented for Deliverable I, which focused on demonstrating data acquisition and transmission. In a full deployment scenario, low-power optimisation and battery usage would become essential for continuous wearable operation.
 
-Provide comparisons if possible (e.g. why not ESP32, why GATT over UART).
+\textbf{[@Sean: IDk I can look at the code and see if there is anything we can do to help with power consumption, just to say yeah in future we can do this. Not sure fully what to say on this point.]} 
+
 
 
 \section{Prototype Design Plan}
 
 \subsection{Subsystems}
+The prototype will be structured into four main subsystems: 
+\begin{itemize}
+	\item \textbf{Sensing:} inertial data acquisition from the FeatherSense accelerometer and gyroscope. 
+	\item \textbf{Communication:} wireless transmission via BLE, using GATT as the chosen protocol. 
+	\item \textbf{Edge Processing:} real-time data handling and basic feature extraction on the Raspberry Pi 4. 
+	\item \textbf{Visualisation:} plotting of data streams to confirm correct reception and interpretation. 
+\end{itemize}
+This breakdown will ensure that each component of the system can be developed and validated independently before integration. 
 
 \subsection{Integration Plan}
+The system will be developed incrementally. The sensor subsystem will first be validated by confirming raw inertial readings on the FeatherSense. Next, BLE transmission will be tested in isolation before final integration. Finally, the gateway will be configured to receive and interpret packets, after which end to end data flow from sensing to visualisation will be verified. 
+
+
+\textbf{[@Sean: idk really, if you have any thoughts on the above two sections.]}
 
 \subsection{Verification Plan}
+Verification activities will be designed to ensure that the prototype meets Deliverable~I requirements. The main checks will include:
+\begin{itemize}
+	\item Confirming that BLE transmission achieves the target 50~Hz sampling rate. 
+	\item Ensuring data packets are correctly structured and fully decoded at the gateway. 
+	\item Validating that received sensor values fall within expected physical ranges (e.g., acceleration values near $\pm 9.8~\text{m/s}^2$ for gravity). 
+	\item Measuring packet loss rates to assess communication reliability. 
+\end{itemize}
+
+
+\subsection{Verification Plan}
+Verification activities will be designed to ensure that the prototype meets Deliverable~I requirements. The main checks will include:
+\begin{itemize}
+	\item Confirming that BLE transmission achieved the target 50~Hz sampling rate. 
+	\item Ensuring data packets were correctly structured and fully decoded at the gateway. 
+	\item Validating that received sensor values were within expected physical ranges (e.g., acceleration values near $\pm 9.8~\text{m/s}^2$ for gravity). 
+\end{itemize}
+
+\textbf{[@Sean: again, some more stuff here maybe on what we are doing with regards verification. Will need to test packet loss. This verification section is just chatgpt nonsense atm]}
 
 \section{Implementation}
 \subsection{Feathersense Node Setup}
-how you collected accel/gyro.
-\subsection{BLE Protocol}
-initial trial with UART + CBOR (limitations), decision to switch to GATT.
-\subsection{Data Transmission}
-sampling frequency, packet size, latency.
+The sensor node was implemented using the Adafruit FeatherSense nRF52840 board. The LSM6DS3 IMU was configured to sample at 50Hz, in line with the publicly available HARTH dataset. Sensor readings (acceleration in m/s\textsuperscript{2} and angular velocity in deg/s) were acquired in real time through the Adafruit CircuitPython libraries. 
 
-Include screenshots/plots of transmitted data (e.g. raw accel/gyro traces).
+\subsection{Communication Performance}
+An initial implementation used the Nordic UART Service over BLE, with payloads encoded in CBOR format. This implementation was functional, but very inneficient. The structured CBOR packets were relatively large, so the transmission was slower and there was an increased coding and decoding overhead on both device and gateway. As a result, the effective sampling rate was limited to approximately 11~Hz, and partial reads often caused incomplete or dropped data. The performance was too poor to be considered as an option, and further measurements of latency or packet loss were not taken in this configuration. 
+
+To address the issues found with the UART method, the system was reimplemented using a custom GATT service with two vendor-defined UUIDs (one for the service and one for the sensor characteristic). Instead of transmitting dictionary structures, the new approach packed six 32 bit floating point values (ax, ay, az, gx, gy, gz) into a fixed length 24 byte payload. This enabled stable streaming at the target rate of 50~Hz without the packet corruption or decoding delays observed previously.
+
+\textbf{[TODO: Record and report packet loss statistics in current implementation.]} 
+
+
 
 
 \section{Implementation of Gateway Device}
+\textbf{[@Sean: I'll leave this to you]} 
 \subsection{Data collection on Raspberry Pi}
 connection with Feathersense via BLE GATT.
 
@@ -141,6 +181,7 @@ Show small plots of raw vs processed features.
 
 
 \subsection{Discussion \& Conclusion}
+\textbf{[@Sean: this once we've done the rest of course]} 
 Summary: successful acquisition, transmission, preprocessing.
 
 Limitations: still simulated/early prototype, real-world testing needed.
@@ -150,20 +191,37 @@ Next steps (for Deliverable II): deploy ML in cloud, integrate with Power BI.
 
 \section*{References}
 
-Cite like so \cite{b6}.
 
 \begin{thebibliography}{00}
-\bibitem{b1} G. Eason, B. Noble, and I. N. Sneddon, ``On certain integrals of Lipschitz-Hankel type involving products of Bessel functions,'' Phil. Trans. Roy. Soc. London, vol. A247, pp. 529--551, April 1955.
-\bibitem{b2} J. Clerk Maxwell, A Treatise on Electricity and Magnetism, 3rd ed., vol. 2. Oxford: Clarendon, 1892, pp.68--73.
-\bibitem{b3} I. S. Jacobs and C. P. Bean, ``Fine particles, thin films and exchange anisotropy,'' in Magnetism, vol. III, G. T. Rado and H. Suhl, Eds. New York: Academic, 1963, pp. 271--350.
-\bibitem{b4} K. Elissa, ``Title of paper if known,'' unpublished.
-\bibitem{b5} R. Nicole, ``Title of paper with only first word capitalized,'' J. Name Stand. Abbrev., in press.
-\bibitem{b6} Y. Yorozu, M. Hirano, K. Oka, and Y. Tagawa, ``Electron spectroscopy studies on magneto-optical media and plastic substrate interface,'' IEEE Transl. J. Magn. Japan, vol. 2, pp. 740--741, August 1987 [Digests 9th Annual Conf. Magnetics Japan, p. 301, 1982].
-\bibitem{b7} M. Young, The Technical Writer's Handbook. Mill Valley, CA: University Science, 1989.
-\bibitem{b8} D. P. Kingma and M. Welling, ``Auto-encoding variational Bayes,'' 2013, arXiv:1312.6114. [Online]. Available: https://arxiv.org/abs/1312.6114
-\bibitem{b9} S. Liu, ``Wi-Fi Energy Detection Testbed (12MTC),'' 2023, gitHub repository. [Online]. Available: https://github.com/liustone99/Wi-Fi-Energy-Detection-Testbed-12MTC
-\bibitem{b10} ``Treatment episode data set: discharges (TEDS-D): concatenated, 2006 to 2009.'' U.S. Department of Health and Human Services, Substance Abuse and Mental Health Services Administration, Office of Applied Studies, August, 2013, DOI:10.3886/ICPSR30122.v2
-\bibitem{b11} K. Eves and J. Valasek, ``Adaptive control for singularly perturbed systems examples,'' Code Ocean, Aug. 2023. [Online]. Available: https://codeocean.com/capsule/4989235/tree
+\bibitem{b1} F. Serpush, M. B. Menhaj, B. Masoumi, and B. Karasfi, 
+``Wearable sensor-based human activity recognition in the smart healthcare system,'' 
+\textit{Comput. Intell. Neurosci.}, vol. 2022, Article ID 1391906, 12 pages, Feb. 2022, doi: 10.1155/2022/1391906.
+
+\bibitem{b2} Health Service Executive (HSE), ``Seniors Alert Scheme,'' \textit{Health Service Executive}, 2024. [Online]. Available: https://www.hse.ie/eng/services/list/4/olderpeople/carersrelatives/community-support-for-older-people-.html. [Accessed: Oct. 19, 2025].
+
+\bibitem{b3} M. Kangas, R. Korpelainen, I. Vikman, L. Nyberg, and T. Jämsä, 
+``Sensitivity and false alarm rate of a fall sensor in long-term fall detection in the elderly,'' 
+\textit{Gerontology}, vol. 61, no. 1, pp. 61--68, 2015, doi: 10.1159/000362720.
+
+\bibitem{b4} E. Malone, ``Staff shortages and public perception leading to healthcare worker burnout, Fórsa research suggests,'' 
+\textit{The Irish Times}, May 15, 2025. [Online]. Available: https://www.irishtimes.com/health/2025/05/15/healthcare-burnout-forsa/. [Accessed: Oct. 19, 2025].
+
+\bibitem{b5} A. Logacjov, K. Bach, A. Kongsvold, H. B. Bårdstu, and P. J. Mork, 
+``HARTH: A Human Activity Recognition Dataset for Machine Learning,'' 
+\textit{Sensors}, vol. 21, no. 23, p. 7853, Dec. 2021, doi: 10.3390/s21237853.
+
+\bibitem{b6} K. Bach, A. Logacjov, A. Kongsvold, H. B. Bårdstu, and P. J. Mork, 
+``A Machine Learning Classifier for Detection of Physical Activity Types and Postures During Free-Living,'' 
+\textit{Journal for the Measurement of Physical Behaviour}, vol. 1, no. aop, pp. 1--8, Dec. 2021, doi: 10.1123/jmpb.2021-0015.
+
+\bibitem{b7} Adafruit Industries, ``Adafruit Feather nRF52840 Sense - Overview,'' [Online]. Available: https://learn.adafruit.com/adafruit-feather-sense/overview. [Accessed: Oct. 19, 2025].
+
+\bibitem{b8} Maker Advisor, ``ESP32 Development Boards Review and Comparison,'' 
+\textit{Maker Advisor}, 2023. [Online]. Available: https://makeradvisor.com/esp32-development-boards-review-comparison/. 
+[Accessed: Oct. 19, 2025].
+
+[Accessed: Oct. 19, 2025].
+
 \end{thebibliography}
 
 \end{document}
