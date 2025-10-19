@@ -3,6 +3,7 @@ import time
 import board
 
 from adafruit_ble import BLERadio
+from adafruit_lsm6ds import Rate
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services import Service
 from adafruit_ble.characteristics import Characteristic
@@ -25,6 +26,9 @@ try:
 except RuntimeError:
     from adafruit_lsm6ds.lsm6ds3 import LSM6DS3 as LSM6DS
     lsm6ds = LSM6DS(i2c)
+
+lsm6ds.accelerometer_data_rate = Rate.RATE_52_HZ
+lsm6ds.gyro_data_rate = Rate.RATE_52_HZ
 
 ble = BLERadio()
 ble.name = "Old Person Life Betterer"
