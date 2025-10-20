@@ -12,3 +12,6 @@ wheels/
 
 # LaTeX-generated files
 **/*.bcf
+**/*.synctex.gz
+**/*.log
+**/*.aux
