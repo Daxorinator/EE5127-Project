@@ -33,7 +33,7 @@ def handle_notification(_, data: bytearray):
         # print(f"Accel (m/s^2): x={ax:.2f}, y={ay:.2f}, z={az:.2f} | "
         #       f"Gyro (dps): x={gx:.2f}, y={gy:.2f}, z={gz:.2f}")
         ax, ay, az, gx, gy, gz = struct.unpack("<ffffff", data)
-        logger.info(f"{ax:.1f},{(ay - 0.2):.1f},{(az - 9.8):.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
+        logger.info(f"{ax:.1f},{(ay + 0.2):.1f},{(az - 9.8):.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
     except Exception as e:
         logger.error(f"Decode error: {e}")
 
