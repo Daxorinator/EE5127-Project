@@ -35,7 +35,6 @@ lsm6ds.gyro_data_rate = Rate.RATE_52_HZ
 led = LEDController()
 blink_task = asyncio.create_task(led.blink())
 
-<<<<<<< HEAD
 
 ble = BLERadio()
 ble.name = "Old Person Life Betterer"
@@ -44,8 +43,6 @@ advertisement = ProvideServicesAdvertisement(sensor_service)
 
 target_dt = 1.0 / 50.0  # 50 Hz
 
-=======
->>>>>>> 05121aa (Resolve merge conflict)
 while True:
     print("Starting the old person life betterer")
     ble.start_advertising(advertisement)
@@ -65,7 +62,6 @@ while True:
                               accel[0], accel[1], accel[2],
                               gyro[0],  gyro[1],  gyro[2])
 
-<<<<<<< HEAD
         try:
             sensor_service.sensor_data = payload
         except Exception:
@@ -75,12 +71,3 @@ while True:
         dt = time.monotonic() - t0
         if dt < target_dt:
             time.sleep(target_dt - dt)
-=======
-    if connected:
-        uart.write(payload)
-<<<<<<< Updated upstream
-    time.sleep(0.01)
-=======
-    time.sleep(0.1)
->>>>>>> Stashed changes
->>>>>>> 05121aa (Resolve merge conflict)
