@@ -37,7 +37,7 @@ blink_task = asyncio.create_task(led.blink())
 
 
 ble = BLERadio()
-ble.name = "Old Person Life Betterer"
+ble.name = "Old Person Life Invader"
 sensor_service = SensorService()
 advertisement = ProvideServicesAdvertisement(sensor_service)
 
