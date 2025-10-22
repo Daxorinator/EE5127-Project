@@ -5,6 +5,10 @@ import logging
 from bleak import BleakScanner, BleakClient
 from collections import deque
 import statistics
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+from threading import Thread
+import numpy as np
 
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 CHAR_UUID    = "12345678-1234-5678-1234-56789abcdef1"
@@ -16,6 +20,9 @@ NOISE_THRESHOLD = 0.1     # Values below this are considered noise (m/s^2 or dps
 # Windowing settings
 WINDOW_SIZE = 128         # 2.56 seconds at 50 Hz
 WINDOW_STEP = 64          # 50% overlap (step by half the window size)
+
+# Plotting settings
+PLOT_HISTORY = 500        # Number of samples to display in live plot
 
 # Configure logging
 logger = logging.getLogger()
@@ -36,6 +43,32 @@ logger.addHandler(file_handler)
 # Create console handler that outputs normal logs to console
 console_handler = logging.StreamHandler()
 logger.addHandler(console_handler)
+
+class PlotData:
+    """Thread-safe container for plot data"""
+    def __init__(self):
+        self.ax_data = deque(maxlen=PLOT_HISTORY)
+        self.ay_data = deque(maxlen=PLOT_HISTORY)
+        self.az_data = deque(maxlen=PLOT_HISTORY)
+        self.gx_data = deque(maxlen=PLOT_HISTORY)
+        self.gy_data = deque(maxlen=PLOT_HISTORY)
+        self.gz_data = deque(maxlen=PLOT_HISTORY)
+        self.timestamps = deque(maxlen=PLOT_HISTORY)
+        self.sample_count = 0
+    
+    def add_sample(self, ax, ay, az, gx, gy, gz):
+        """Add a new sample to the plot data"""
+        self.ax_data.append(ax)
+        self.ay_data.append(ay)
+        self.az_data.append(az)
+        self.gx_data.append(gx)
+        self.gy_data.append(gy)
+        self.gz_data.append(gz)
+        self.timestamps.append(self.sample_count / 50.0)  # Convert to seconds
+        self.sample_count += 1
+
+# Global plot data
+plot_data = PlotData()
 
 class SensorProcessor:
     def __init__(self):
@@ -140,6 +173,9 @@ def handle_notification(_, data: bytearray):
         # Process data with calibration and filtering
         ax_f, ay_f, az_f, gx_f, gy_f, gz_f = sensor_processor.process(ax, ay, az, gx, gy, gz)
         
+        # Add to plot data
+        plot_data.add_sample(ax_f, ay_f, az_f, gx_f, gy_f, gz_f)
+        
         # Add to sliding window
         window = sensor_processor.add_to_window(ax_f, ay_f, az_f, gx_f, gy_f, gz_f)
         
@@ -151,7 +187,90 @@ def handle_notification(_, data: bytearray):
     except Exception as e:
         logger.error(f"Decode error: {e}")
 
+def setup_plot():
+    """Setup matplotlib figure and axes"""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+    
+    # Accelerometer plot
+    line_ax, = ax1.plot([], [], 'r-', label='X', linewidth=1)
+    line_ay, = ax1.plot([], [], 'g-', label='Y', linewidth=1)
+    line_az, = ax1.plot([], [], 'b-', label='Z', linewidth=1)
+    ax1.set_xlim(0, PLOT_HISTORY / 50.0)
+    ax1.set_ylim(-20, 20)
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel('Acceleration (m/s²)')
+    ax1.set_title('Accelerometer Data')
+    ax1.legend(loc='upper right')
+    ax1.grid(True, alpha=0.3)
+    
+    # Gyroscope plot
+    line_gx, = ax2.plot([], [], 'r-', label='X', linewidth=1)
+    line_gy, = ax2.plot([], [], 'g-', label='Y', linewidth=1)
+    line_gz, = ax2.plot([], [], 'b-', label='Z', linewidth=1)
+    ax2.set_xlim(0, PLOT_HISTORY / 50.0)
+    ax2.set_ylim(-500, 500)
+    ax2.set_xlabel('Time (s)')
+    ax2.set_ylabel('Angular Velocity (dps)')
+    ax2.set_title('Gyroscope Data')
+    ax2.legend(loc='upper right')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    lines = {
+        'ax': line_ax, 'ay': line_ay, 'az': line_az,
+        'gx': line_gx, 'gy': line_gy, 'gz': line_gz
+    }
+    
+    return fig, ax1, ax2, lines
+
+def animate(frame, ax1, ax2, lines):
+    """Animation function called by FuncAnimation"""
+    if len(plot_data.timestamps) == 0:
+        return lines.values()
+    
+    # Convert deques to lists for plotting
+    times = list(plot_data.timestamps)
+    
+    # Update accelerometer lines
+    lines['ax'].set_data(times, list(plot_data.ax_data))
+    lines['ay'].set_data(times, list(plot_data.ay_data))
+    lines['az'].set_data(times, list(plot_data.az_data))
+    
+    # Update gyroscope lines
+    lines['gx'].set_data(times, list(plot_data.gx_data))
+    lines['gy'].set_data(times, list(plot_data.gy_data))
+    lines['gz'].set_data(times, list(plot_data.gz_data))
+    
+    # Auto-adjust x-axis to show latest data
+    if len(times) > 0:
+        x_max = times[-1]
+        x_min = max(0, x_max - (PLOT_HISTORY / 50.0))
+        ax1.set_xlim(x_min, x_max)
+        ax2.set_xlim(x_min, x_max)
+    
+    return lines.values()
+
+def start_plot():
+    """Start matplotlib in a separate thread"""
+    fig, ax1, ax2, lines = setup_plot()
+    
+    # Create animation with 20 FPS (50ms interval)
+    ani = animation.FuncAnimation(
+        fig, animate, 
+        fargs=(ax1, ax2, lines),
+        interval=50,  # 50ms = 20 FPS
+        blit=True,
+        cache_frame_data=False
+    )
+    
+    plt.show()
+
 async def main():
+    # Start matplotlib in a separate thread
+    plot_thread = Thread(target=start_plot, daemon=True)
+    plot_thread.start()
+    
     logger.info("Scanning for BLE devices...")
     devices = await BleakScanner.discover(timeout=5.0)
 
