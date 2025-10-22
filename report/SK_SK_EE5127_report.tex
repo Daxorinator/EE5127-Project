@@ -65,6 +65,18 @@ The aim of this project is to design and implement an IoT system for activity cl
 
 \section{System Design}
 
+\subsection{Design Requirements}
+There are several key requirements which must be considered when designing wearable IoT devices:
+\begin{itemize}
+	\item Long operational period / battery life
+	\item Medium-range communication - 10-30 meters including walls
+	\item Reliable data transmission
+	\item Accurate sensing - for activity classification, accurate motion sensing
+	\item Comfort - wearables need to be small and lightweight
+\end{itemize}
+
+The device must be able to run for at least 24 hours, ideally much longer, between charges to avoid frequent patient disturbance and unnecessary additional work for healthcare workers. The device ideally needs to be able to communicate at medium-range including at least one wall in a hospital or senior living environment if it is to be an effective activity tracker. With the goal of the project being real-time classification and alerting, the data stream needs to be consistent and reliable, not reconnecting frequently or dropping packets. Additionally, the sensors employed for motion sensing, mainly accelerometers and gyroscopes, must be precise enough to allow the classifier to distinguish between different activities, however this is less of a concern as smartphones have had this technology for over a decade. The component selections outlined in Section~\ref{components} aim to fulfil or exceed all of these requirements where possible, whilst also outlining a suitable prototyping platform for the device.
+
 \subsection{Block diagram of the IoT system}
 The overall architecture of the IoT system is illustrated in Fig.~\ref{fig:block_diagram}. The future expansion of the project is represented by the blocks with dotted outlines.
 
@@ -84,20 +96,31 @@ The Gateway / Edge Compute Layer features an IoT Gateway with a BLE module for c
 
 The Application Layer consists of a machine-learning and data analytics pipeline where a machine learning model classifies the current activity using the received data. The classification, time, and received data are saved in a time-series database for long-term storage, allowing healthcare professionals to access historical activity data for their patients, and configure alerting for patients who are idle for too long or who may be over-active during their recovery.
 
+\section{Component Selections}\label{components}
 
-\section{Component Selections}\label{CS}
+\subsection{Sensing module}
+The BMI160 Low-Power 6-Axis IMU\cite{BMI160} combines a 3-axis accelerometer and a 3-axis gyroscope, both supporting $\pm2G$, $\pm4G$, $\pm8G$, and $\pm16G$ modes, configurable over its serial interface. It uses a simple I2C interface and can operate at voltages between 1.7 and 3.6v, consuming only 1mA when both the accelerometer and gyroscope are active at a 100Hz sample rate. It can be configured to operate at lower sample rates and uses just $180\mu A$ when in accelerometer-only mode at 100Hz. It also features intelligent power management and can go into a sleep state during rest, reactivating the gyroscope only when movement is detected, further reducing power consumption. Bosch advertises this device as an ideal choice for wearable IoT devices.
 
-\subsection{Sensor Node}\label{SN}
-The Adafruit FeatherSense nRF52840\cite{b7} was provided as the designated sensor node. This board integrates multiple sensors (e.g., accelerometer/gyroscope, magnetometer, microphone, temperature, humidity, and pressure sensors) along with native BLE support. For this project, only the accelerometer and gyroscope were used, as these correspond directly with the HARTH dataset \cite{b5,b6} chosen for activity recognition. The other onboard sensors were not relevant to the project aims and were therefore excluded.
+Altogether this sensor meets the ultra-low power requirement, has more than sufficient resolution at 16-bit, provides all essential data for the machine learning pipeline, and is a widely used option in the field.
 
-Although platforms like the Espressif ESP32 DecKitC are used widely in other IoT projects, offering Wi-Fi and BLE connectivity \cite{b8}, they typically require an external intertial measurement unit (IMU) if accelerometer or gyroscope sensing is needed. This comes with an increased cost, complexity and board count. The FeatherSense nRF52840 on the other hand comes with an integrated LSM6DS3 IMU, native BLE, and USB \& Batter charging support in one package. This makes it more suitable for the project's requirements for a self contained inertial sensor node.
+The BMI270, also from Bosch SensorTec, is the next-generation model of the BMI160, providing more accuracy, self-calibration, and movement recognition, and while some of these features may be useful in this context, it does not justify the increased cost, significant increase in firmware complexity due to its boot-time configuration requirement, and higher power draw.
 
+Similarly, the MPU-6050, a highly well-known IMU in industry, also elicits a 4x higher power consumption than the BMI160 in a larger package - at 3.9 mA, it is still a viable choice, however with the wide availability of the BMI160, it remains the ideal choice.
 
-\subsection{Gateway}\label{GW}
+\subsection{IoT Node}
+The Nordic nRF52810 microcontroller\cite{nRF52810} is an ideal choice for powering the wearable IoT node. It features a 32-bit ARM Cortex-M4 processor running a 64 Mhz, and 192kB flash memory with 24kB of RAM. This is more than sufficient for simple data collection, packaging, and transmission. It also features integrated BLE 5.0 meaning an external module is not needed. It consumes a miniscule $2.0\mu A$ at 3.3 volts when idle, and peaks at just 4.6mA when transmitting or receiving data, making it an ideal choice for a low-power wearable IoT device. The chip also supports ANT, and has a 2.4Ghz transceiver which can be used to develop proprietary protocols if needed.
+
+Another option which was considered is the STM32L031 - an excellent low power option which costs slightly less than the nRF52810, however, this microcontroller does not feature an on-board BLE module, thus ultimately raising the price and design complexity by requiring an external communication IC. 
+
+Other platforms like the Espressif ESP32-C3 are used widely in IoT projects, offering Wi-Fi as well as BLE connectivity, more processing power, and cryptography acceleration\cite{b8}, they typically have a much higher power requirement, as much as 130mA while active. Using these in production comes with an increased cost for no benefit and vastly diminishes battery life.
+
+The Adafruit FeatherSense nRF52840\cite{b7} was chosen as a prototyping board for the project. This board provides a microcontroller from the same family as the production microcontroller, and integrates multiple sensors (e.g., accelerometer/gyroscope, magnetometer, microphone, temperature, humidity, and pressure sensors) along with native BLE support. For this project, only the accelerometer and gyroscope were used, as these sensors correspond with the data requirements of the HARTH dataset \cite{b5,b6} powering the activity classifier in the Cloud IoT pipeline.
+
+\subsection{Gateway}
 The Raspberry Pi 4 served as the IoT gateway. This device was issued for this project, and it has the sufficient computing capacity, integrated BLE support, and compatibility with Python's data acquisition and processing libraries. 
 \textbf{[@Sean: again, if you want to add anything here. I think from the brief maybe we do need to do some comparison, like what I did inthe last paragraph]} 
 
-\subsection{Communication}\label{COM}
+\subsection{Communication}
 BLE was the protocol used, as it is the only wireless option natively supported by the FeatherSense nRF52840 board. An initial implementation used BLE UART with CBOR encoding. However this was too slow. To meet the 50~Hz sampling target, the system was reimplemented using BLE GATT, transmitting fixed length packets of six floating point values. This achieved stable operation at the required frequency.
 
 \subsection{Power}
