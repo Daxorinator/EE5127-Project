@@ -189,7 +189,7 @@ def handle_notification(_, data: bytearray):
 
 def setup_plot():
     """Setup matplotlib figure and axes"""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
     
     # Accelerometer plot
     line_ax, = ax1.plot([], [], 'r-', label='X', linewidth=1)
