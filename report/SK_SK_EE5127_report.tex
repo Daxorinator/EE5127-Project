@@ -82,7 +82,7 @@ The overall architecture of the IoT system is illustrated in Fig.~\ref{fig:block
 
 \begin{figure}[h]
 	\centering
-	\includegraphics[width=0.5\textwidth]{media/basic_diagram.png}
+	\includegraphics[width=0.5\textwidth]{media/basic_architecture_overview.png}
 	\caption{Block diagram of the IoT system, showing the layered design from sensing to future cloud integration.}
 	\label{fig:block_diagram}
 \end{figure}
@@ -108,7 +108,7 @@ The BMI270, also from Bosch SensorTec, is the next-generation model of the BMI16
 Similarly, the MPU-6050, a highly well-known IMU in industry, also elicits a 4x higher power consumption than the BMI160 in a larger package - at 3.9 mA, it is still a viable choice, however with the wide availability of the BMI160, it remains the ideal choice.
 
 \subsection{IoT Node}
-The Nordic nRF52810 microcontroller\cite{nRF52810} is an ideal choice for powering the wearable IoT node. It features a 32-bit ARM Cortex-M4 processor running a 64 Mhz, and 192kB flash memory with 24kB of RAM. This is more than sufficient for simple data collection, packaging, and transmission. It also features integrated BLE 5.0 meaning an external module is not needed. It consumes a miniscule $2.0\mu A$ at 3.3 volts when idle, and peaks at just 4.6mA when transmitting or receiving data, making it an ideal choice for a low-power wearable IoT device. The chip also supports ANT, and has a 2.4Ghz transceiver which can be used to develop proprietary protocols if needed.
+The Nordic Semiconductor nRF52810 microcontroller\cite{nRF52810} is an ideal choice for powering the wearable IoT node. It features a 32-bit ARM Cortex-M4 processor running a 64 Mhz, and 192kB flash memory with 24kB of RAM. This is more than sufficient for simple data collection, packaging, and transmission. It also features integrated BLE 5.0 meaning an external module is not needed. It consumes a miniscule $2.0\mu A$ at 3.3 volts when idle, and peaks at just 4.6mA when transmitting or receiving data, making it an ideal choice for a low-power wearable IoT device. The chip also supports ANT, and has a 2.4Ghz transceiver which can be used to develop proprietary protocols if needed.
 
 Another option which was considered is the STM32L031 - an excellent low power option which costs slightly less than the nRF52810, however, this microcontroller does not feature an on-board BLE module, thus ultimately raising the price and design complexity by requiring an external communication IC. 
 
@@ -117,18 +117,30 @@ Other platforms like the Espressif ESP32-C3 are used widely in IoT projects, off
 The Adafruit FeatherSense nRF52840\cite{b7} was chosen as a prototyping board for the project. This board provides a microcontroller from the same family as the production microcontroller, and integrates multiple sensors (e.g., accelerometer/gyroscope, magnetometer, microphone, temperature, humidity, and pressure sensors) along with native BLE support. For this project, only the accelerometer and gyroscope were used, as these sensors correspond with the data requirements of the HARTH dataset \cite{b5,b6} powering the activity classifier in the Cloud IoT pipeline.
 
 \subsection{Gateway}
-The Raspberry Pi 4 served as the IoT gateway. This device was issued for this project, and it has the sufficient computing capacity, integrated BLE support, and compatibility with Python's data acquisition and processing libraries. 
-\textbf{[@Sean: again, if you want to add anything here. I think from the brief maybe we do need to do some comparison, like what I did inthe last paragraph]} 
+For this project, the Raspberry Pi 4 serves as the IoT gateway. The Pi 4 Model B 4GB RAM variant features a Broadcom BCM2711, a System-on-Chip containing a quad-core ARM Cortex-A72 processor. All Pi 4 Model Bs feature LPDDR4 memory running at 3200Mhz. It features on-board 2.4Ghz and 5.0Ghz WiFi, Gigabit Ethernet, Bluetooth 5.0 and BLE 5.0, and a Micro SD card slot. The device consumes a maximum of 15w under load, and takes up quite a small space. With the amount of processing available on-board, and at a cost of only \$60 USD, the Pi 4 is an ideal choice for communicating with, and handling data from a large volume of IoT nodes. The Pi 4 runs a full Linux environment by default but can easily be customized to run a stripped back Linux distribution designed solely to run IoT Gateway functions. As it uses Linux, it natively supports Python for prototyping and C/C++ for production deployments as standard, with a wide variety of libraries available for BLE communication, MQTT for sending data to the cloud, edge machine learning libraries, and much more.
+
+Additionally, the Raspberry Pi can be accessed remotely and easily serviced by means of re-imaging should anything go wrong, or if remote diagnostics / application support is required.
+
+An industrial IoT gateway device such as a RAD IoT Gateway could run from hundreds to thousands of euro, and is completely overkill for a small-to-medium scale deployment like in a hospital environment or nursing home. Additionally, it comes with vendor lock-in and increased development times due to is proprietary nature.
 
 \subsection{Communication}
-BLE was the protocol used, as it is the only wireless option natively supported by the FeatherSense nRF52840 board. An initial implementation used BLE UART with CBOR encoding. However this was too slow. To meet the 50~Hz sampling target, the system was reimplemented using BLE GATT, transmitting fixed length packets of six floating point values. This achieved stable operation at the required frequency.
+Bluetooth Low Energy 5.0 (BLE 5) was selected for communicating between the IoT Device and the Gateway. The nRF52810 contains an integrated BLE 5 communication module, with a transmit power of up to 4 dBm. With this power, 10-30m range including obstacles can easily be done, at data rates of up to 2 Mbps if necessary. Additionally, BLE is designed for many-to-one communication, making it easy to connect many devices to the Raspberry Pi 4 IoT Gateway.
+
+Other options considered were Zigbee, which is a very low power mesh-networking solution, however it requires a separate network coordinator IC not available on the nRF52810 or the Raspberry Pi. Additionally, it features much lower data rates, and a mesh network is not needed for a deployment of the proposed size.
+
+WiFi HaLow was also considered initially due to its long range and configurable data rates, however it also requires external hardware and has a much higher power requirement than BLE 5, making it a less than ideal choice for a wearable device.
+
+The Bluetooth Low Energy protocol is also natively supported by the FeatherSense nRF52840 board. The initial implementation of sensor data communication used BLE UART with Concise Binary Object Representation (CBOR) encoding - ``The Concise Binary Object Representation (CBOR) is a data format whose design goals include the possibility of extremely small code size, fairly small message size, and extensibility without the need for version negotiation.''\cite{cbor}. Ulimately, the UART was too slow to meet the 50~Hz sampling target, and the system was reimplemented using BLE GATT at a data rate of 52 packets per second, where fixed length packets of six floating point values were used. This allowed stable data transmission of at least 50 samples per second for each each of the 6 axes of the IMU.
 
 \subsection{Power}
-For prototyping, the FeatherSense was powered via USB, which ensured stability and ease of development. The board supports battery operation, but this was not implemented for Deliverable I, which focused on demonstrating data acquisition and transmission. In a full deployment scenario, low-power optimisation and battery usage would become essential for continuous wearable operation.
 
-\textbf{[@Sean: IDk I can look at the code and see if there is anything we can do to help with power consumption, just to say yeah in future we can do this. Not sure fully what to say on this point.]} 
+For power, a pair of AA-sized rechargeable Lithium Iron Phosphate (LiFePO4) batteries, combined with a Nordic Semiconductor nPM1300 Power Management IC, which brings power regulation for the microcontroller, battery level gauging, a system-level power watchdog, and battery charge management compatible with LiFePO4 and supporting USB-C as standard.
 
+The Lithium Iron Phosphate Battery in AA size is an ideal choice for the amount of space available, and is much safer than options such as Lithium Ion or Lithium Polymer batteries which can fail catastrophically if over-discharged, improperly recharged, or pierced. Each AA-sized LiFePo battery has a 600 mAh capacity, together allowing the device to run for days at a time. They are lightweight, weighing just 18 grams each, and most importantly, can support over 2000 charge cycles when using an 80\% Depth of Discharge, which can be done using the nPM1300. 
 
+Other alternatives considered were Lithium Ion and Lithium Polymer batteries, but both solutions are less stable and have a lower energy density than LiFePo4 batteries. For battery management and voltage regulation, the MCP73831 charging IC was considered for many of the same reasons as the nPM1300 - it supports USB-C, a 3.2v nominal battery voltage, automatic charge termination, and status indicators. This, in combination with the TPS62840 buck converter for voltage regulation, which supports converting 6.4v to 3.3v at a 90\% efficiency at the proposed loads, was the original power system designed for the device. Given that both devices could be combined into a single chip with a system-level power watchdog and battery level gauge if the nPM1300 was used, this led to their removal from the design.
+
+For prototyping, the FeatherSense board was powered via USB battery pack, which ensured stability and ease of development.
 
 \section{Prototype Design Plan}
 
