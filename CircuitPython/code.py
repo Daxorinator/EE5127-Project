@@ -5,7 +5,7 @@ import board
 import asyncio
 
 from adafruit_ble import BLERadio
-from adafruit_lsm6ds import Rate
+from adafruit_lsm6ds import Rate, AccelRange, GyroRange
 from adafruit_ble.advertising.standard import ProvideServicesAdvertisement
 from adafruit_ble.services import Service
 from adafruit_ble.characteristics import Characteristic
@@ -29,12 +29,11 @@ except RuntimeError:
     from adafruit_lsm6ds.lsm6ds3 import LSM6DS3 as LSM6DS
     lsm6ds = LSM6DS(i2c)
 
-lsm6ds.accelerometer_data_rate = Rate.RATE_52_HZ
-lsm6ds.gyro_data_rate = Rate.RATE_52_HZ
+lsm6ds.accelerometer_data_rate = Rate.RATE_3_33K_HZ
+lsm6ds.gyro_data_rate = Rate.RATE_3_33K_HZ
 
 led = LEDController()
 blink_task = asyncio.create_task(led.blink())
-
 
 ble = BLERadio()
 ble.name = "Old Person Life Invader"
@@ -44,7 +43,9 @@ advertisement = ProvideServicesAdvertisement(sensor_service)
 target_dt = 1.0 / 50.0  # 50 Hz
 
 while True:
-    print("Starting the old person life betterer")
+    print(f"BLE name: {ble.name}")
+    print(f"AccelRange set to: {AccelRange.string[lsm6ds.accelerometer_range]}")
+    print(f"GyroRange set to: {GyroRange.string[lsm6ds.gyro_range]}")
     ble.start_advertising(advertisement)
     while not ble.connected:
         led.set_color((255, 0, 0))

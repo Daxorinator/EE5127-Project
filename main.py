@@ -109,7 +109,7 @@ class SensorProcessor:
         self.ax_offset = statistics.mean(ax_samples)
         self.ay_offset = statistics.mean(ay_samples)
         # For Z-axis accelerometer, offset to remove gravity (9.8 m/s^2)
-        self.az_offset = statistics.mean(az_samples) - 9.8
+        self.az_offset = statistics.mean(az_samples)
         self.gx_offset = statistics.mean(gx_samples)
         self.gy_offset = statistics.mean(gy_samples)
         self.gz_offset = statistics.mean(gz_samples)
