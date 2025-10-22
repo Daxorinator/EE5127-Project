@@ -6,9 +6,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 from bleak import BleakScanner, BleakClient
+from collections import deque
+import statistics
 
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 CHAR_UUID    = "12345678-1234-5678-1234-56789abcdef1"
+
+# Calibration settings
+CALIBRATION_SAMPLES = 50  # Number of samples to average for calibration
+NOISE_THRESHOLD = 0.1     # Values below this are considered noise (m/s^2 or dps)
 
 # Configure logging
 logger = logging.getLogger()
@@ -19,125 +25,104 @@ for handler in logger.handlers[:]:
     logger.removeHandler(handler)
 
 # Create a custom formatter with no prefix
-formatter = logging.Formatter('%(message)s')
+csv_formatter = logging.Formatter('%(message)s')
 
-# Create file handler that overwrites the file
+# Create file handler that dumps logged data to CSV
 file_handler = logging.FileHandler('data.csv', mode='w')
-file_handler.setFormatter(formatter)
+file_handler.setFormatter(csv_formatter)
 logger.addHandler(file_handler)
 
-# Create console handler
+# Create console handler that outputs normal logs to console
 console_handler = logging.StreamHandler()
-console_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 
-class DataWindow:
-    def __init__(self, window_size=133):
-        self.window_size = window_size
-        self.data = []
-        self.ready = False
-        self.time = np.linspace(0, 2.56, window_size)  # Time axis for 2.56s window
-
-    def add_sample(self, sample):
-        self.data.append(sample)
-        if len(self.data) >= self.window_size:
-            self.ready = True
+class SensorProcessor:
+    def __init__(self):
+        # Calibration offsets
+        self.ax_offset = 0.0
+        self.ay_offset = 0.0
+        self.az_offset = 0.0
+        self.gx_offset = 0.0
+        self.gy_offset = 0.0
+        self.gz_offset = 0.0
+        
+        # Calibration data collection
+        self.calibration_data = []
+        self.is_calibrated = False
+        
+    def add_calibration_sample(self, ax, ay, az, gx, gy, gz):
+        """Collect samples for calibration"""
+        self.calibration_data.append((ax, ay, az, gx, gy, gz))
+        
+        if len(self.calibration_data) >= CALIBRATION_SAMPLES:
+            self._compute_offsets()
             return True
         return False
-
-    def get_data(self):
-        return self.data[:self.window_size]
-
-    def get_arrays(self):
-        if not self.data:
-            return None
-        data_array = np.array(self.data[:self.window_size])
-        return {
-            'time': self.time,
-            'accel': data_array[:, :3],  # First 3 columns (ax, ay, az)
-            'gyro': data_array[:, 3:]    # Last 3 columns (gx, gy, gz)
-        }
-
-    def shift_window(self):
-        shift_size = self.window_size // 2
-        self.data = self.data[shift_size:]
-        self.ready = False
-
-class DataCollector:
-    def __init__(self):
-        self.current_window = DataWindow()
-        self.window_count = 0
-        self.setup_plot()
-
-    def setup_plot(self):
-        plt.ion()  # Enable interactive mode
-        self.fig, (self.ax1, self.ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    
+    def _compute_offsets(self):
+        """Compute average offsets from calibration samples"""
+        ax_samples = [s[0] for s in self.calibration_data]
+        ay_samples = [s[1] for s in self.calibration_data]
+        az_samples = [s[2] for s in self.calibration_data]
+        gx_samples = [s[3] for s in self.calibration_data]
+        gy_samples = [s[4] for s in self.calibration_data]
+        gz_samples = [s[5] for s in self.calibration_data]
         
-        # Setup accelerometer subplot
-        self.ax1.set_title('Accelerometer Data')
-        self.ax1.set_ylabel('Acceleration (m/s²)')
-        self.ax1.grid(True)
-        self.accel_lines = [self.ax1.plot([], [], label=label)[0] 
-                           for label in ['X', 'Y', 'Z']]
-        self.ax1.legend()
-
-        # Setup gyroscope subplot
-        self.ax2.set_title('Gyroscope Data')
-        self.ax2.set_xlabel('Time (s)')
-        self.ax2.set_ylabel('Angular Velocity (dps)')
-        self.ax2.grid(True)
-        self.gyro_lines = [self.ax2.plot([], [], label=label)[0] 
-                          for label in ['X', 'Y', 'Z']]
-        self.ax2.legend()
-
-        plt.tight_layout()
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-
-    def update_plot(self, data_dict):
-        if data_dict is None:
-            return
-
-        # Update accelerometer data
-        for i, line in enumerate(self.accel_lines):
-            line.set_data(data_dict['time'], data_dict['accel'][:, i])
-        self.ax1.relim()
-        self.ax1.autoscale_view()
-
-        # Update gyroscope data
-        for i, line in enumerate(self.gyro_lines):
-            line.set_data(data_dict['time'], data_dict['gyro'][:, i])
-        self.ax2.relim()
-        self.ax2.autoscale_view()
-
-        self.fig.canvas.draw()
-        self.fig.canvas.flush_events()
-
-    def add_sample(self, sample):
-        if self.current_window.add_sample(sample):
-            # Window is full
-            window_data = self.current_window.get_data()
-            self.process_window(window_data)
-            self.current_window.shift_window()
-            self.window_count += 1
-
-    def process_window(self, window_data):
-        logger.info(f"Window {self.window_count}:")
-        for sample in window_data:
-            ax, ay, az, gx, gy, gz = sample
-            logger.info(f"{ax:.1f},{(ay + 0.2):.1f},{(az - 9.8):.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
-        logger.info("")  # Empty line between windows
+        self.ax_offset = statistics.mean(ax_samples)
+        self.ay_offset = statistics.mean(ay_samples)
+        # For Z-axis accelerometer, offset to remove gravity (9.8 m/s^2)
+        self.az_offset = statistics.mean(az_samples) - 9.8
+        self.gx_offset = statistics.mean(gx_samples)
+        self.gy_offset = statistics.mean(gy_samples)
+        self.gz_offset = statistics.mean(gz_samples)
         
-        # Update the plot with the current window data
-        data_arrays = self.current_window.get_arrays()
-        self.update_plot(data_arrays)
+        self.is_calibrated = True
+        logger.info(f"Calibration complete: ax={self.ax_offset:.3f}, ay={self.ay_offset:.3f}, "
+                   f"az={self.az_offset:.3f}, gx={self.gx_offset:.3f}, gy={self.gy_offset:.3f}, "
+                   f"gz={self.gz_offset:.3f}")
+    
+    def apply_noise_filter(self, value):
+        """Apply dead-zone filter to remove small noise"""
+        return 0.0 if abs(value) < NOISE_THRESHOLD else value
+    
+    def process(self, ax, ay, az, gx, gy, gz):
+        """Apply calibration and noise filtering"""
+        # Apply offsets
+        ax_cal = ax - self.ax_offset
+        ay_cal = ay - self.ay_offset
+        az_cal = az - self.az_offset
+        gx_cal = gx - self.gx_offset
+        gy_cal = gy - self.gy_offset
+        gz_cal = gz - self.gz_offset
+        
+        # Apply noise filter
+        ax_filtered = self.apply_noise_filter(ax_cal)
+        ay_filtered = self.apply_noise_filter(ay_cal)
+        az_filtered = self.apply_noise_filter(az_cal)
+        gx_filtered = self.apply_noise_filter(gx_cal)
+        gy_filtered = self.apply_noise_filter(gy_cal)
+        gz_filtered = self.apply_noise_filter(gz_cal)
+        
+        return ax_filtered, ay_filtered, az_filtered, gx_filtered, gy_filtered, gz_filtered
 
-data_collector = DataCollector()
+# Global sensor processor
+sensor_processor = SensorProcessor()
 
 def handle_notification(_, data: bytearray):
     try:
-        values = struct.unpack("<ffffff", data)
-        data_collector.add_sample(values)
+        ax, ay, az, gx, gy, gz = struct.unpack("<ffffff", data)
+        
+        # Calibration phase
+        if not sensor_processor.is_calibrated:
+            calibrated = sensor_processor.add_calibration_sample(ax, ay, az, gx, gy, gz)
+            if calibrated:
+                logger.info("acceleration_x,acceleration_y,acceleration_z,gyro_x,gyro_y,gyro_z")
+            return
+        
+        # Process data with calibration and filtering
+        ax_f, ay_f, az_f, gx_f, gy_f, gz_f = sensor_processor.process(ax, ay, az, gx, gy, gz)
+        
+        logger.info(f"{ax_f:.1f},{ay_f:.1f},{az_f:.1f},{gx_f:.1f},{gy_f:.1f},{gz_f:.1f}")
     except Exception as e:
         logger.error(f"Decode error: {e}")
 
@@ -147,7 +132,6 @@ async def main():
 
     target = None
     for d in devices:
-        # logger.info(f"Found {d.name} ({d.address})")
         if d.name and "Old Person Life Invader" in d.name:
             target = d
             break
@@ -157,10 +141,12 @@ async def main():
         return
 
     async with BleakClient(target.address) as client:
-        logger.info("acceleration_x,acceleration_y,acceleration_z,gyro_x,gyro_y,gyro_z")
+        logger.info(f"Connected to {target.name}")
+        logger.info(f"Calibrating sensors... (collecting {CALIBRATION_SAMPLES} samples)")
+        logger.info("Please keep device still during calibration")
+        
         await client.start_notify(CHAR_UUID, handle_notification)
 
-        # logger.info("Subscribed to accel+gyro data. Listening (Ctrl+C to quit)...")
         try:
             while True:
                 await asyncio.sleep(1.0)
@@ -171,4 +157,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
