@@ -32,6 +32,9 @@ except RuntimeError:
 lsm6ds.accelerometer_data_rate = Rate.RATE_3_33K_HZ
 lsm6ds.gyro_data_rate = Rate.RATE_3_33K_HZ
 
+lsm6ds.accelerometer_range = AccelRange.RANGE_8G
+lsm6ds.gyro_range = GyroRange.RANGE_2000_DPS
+
 led = LEDController()
 blink_task = asyncio.create_task(led.blink())
 
