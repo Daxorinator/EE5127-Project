@@ -2,9 +2,6 @@ import asyncio
 import struct
 import io
 import logging
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation
 from bleak import BleakScanner, BleakClient
 from collections import deque
 import statistics
@@ -15,6 +12,10 @@ CHAR_UUID    = "12345678-1234-5678-1234-56789abcdef1"
 # Calibration settings
 CALIBRATION_SAMPLES = 50  # Number of samples to average for calibration
 NOISE_THRESHOLD = 0.1     # Values below this are considered noise (m/s^2 or dps)
+
+# Windowing settings
+WINDOW_SIZE = 128         # 2.56 seconds at 50 Hz
+WINDOW_STEP = 64          # 50% overlap (step by half the window size)
 
 # Configure logging
 logger = logging.getLogger()
@@ -49,6 +50,10 @@ class SensorProcessor:
         # Calibration data collection
         self.calibration_data = []
         self.is_calibrated = False
+        
+        # Sliding window buffer
+        self.window_buffer = deque(maxlen=WINDOW_SIZE)
+        self.samples_since_last_window = 0
         
     def add_calibration_sample(self, ax, ay, az, gx, gy, gz):
         """Collect samples for calibration"""
@@ -104,6 +109,19 @@ class SensorProcessor:
         gz_filtered = self.apply_noise_filter(gz_cal)
         
         return ax_filtered, ay_filtered, az_filtered, gx_filtered, gy_filtered, gz_filtered
+    
+    def add_to_window(self, ax, ay, az, gx, gy, gz):
+        """Add sample to sliding window and return window when ready"""
+        self.window_buffer.append((ax, ay, az, gx, gy, gz))
+        self.samples_since_last_window += 1
+        
+        # Check if we have a full window and have stepped far enough
+        if len(self.window_buffer) == WINDOW_SIZE and self.samples_since_last_window >= WINDOW_STEP:
+            self.samples_since_last_window = 0
+            # Return a copy of the current window
+            return list(self.window_buffer)
+        
+        return None
 
 # Global sensor processor
 sensor_processor = SensorProcessor()
@@ -116,13 +134,20 @@ def handle_notification(_, data: bytearray):
         if not sensor_processor.is_calibrated:
             calibrated = sensor_processor.add_calibration_sample(ax, ay, az, gx, gy, gz)
             if calibrated:
-                logger.info("acceleration_x,acceleration_y,acceleration_z,gyro_x,gyro_y,gyro_z")
+                logger.info("window_id,sample_id,acceleration_x,acceleration_y,acceleration_z,gyro_x,gyro_y,gyro_z")
             return
         
         # Process data with calibration and filtering
         ax_f, ay_f, az_f, gx_f, gy_f, gz_f = sensor_processor.process(ax, ay, az, gx, gy, gz)
         
-        logger.info(f"{ax_f:.1f},{ay_f:.1f},{az_f:.1f},{gx_f:.1f},{gy_f:.1f},{gz_f:.1f}")
+        # Add to sliding window
+        window = sensor_processor.add_to_window(ax_f, ay_f, az_f, gx_f, gy_f, gz_f)
+        
+        # If we have a complete window, log it
+        if window is not None:
+            window_id = (len(sensor_processor.window_buffer) - WINDOW_SIZE) // WINDOW_STEP + 1
+            for sample_id, (ax, ay, az, gx, gy, gz) in enumerate(window):
+                logger.info(f"{window_id},{sample_id},{ax:.1f},{ay:.1f},{az:.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
     except Exception as e:
         logger.error(f"Decode error: {e}")
 
