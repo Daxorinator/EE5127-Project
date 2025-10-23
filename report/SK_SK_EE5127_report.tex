@@ -44,8 +44,7 @@ s.kelly178@universityofgalway.ie}
 \maketitle
 
 \begin{abstract}
-This document is a model and instructions for \LaTeX.
-YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS YOLKS 
+Healthcare facilities are facing increasing challenges in patient care for patients with assisted mobility needs or exercise-focused rehabilitation due to on-going staff shortages and a lack of patient monitoring systems in this field. Existing solutions such as fall alarms are useful in emergency scenarios but fail to account for day to day mobility needs and patient recovery. This paper presents the design and implementation of an IoT-based activity classification and monitoring system using a wearable inertial sensing device and machine learning pipeline. The system utilises a hip-worn sensor node with a 6-axis IMU which transmits data to an edge gateway for real-time processing, followed by cloud-based machine learning for activity classification. The design focuses on battery life, medium-range communication, data accuracy, and providing a foundation for a scalable, continuous monitoring platform for healthcare environments.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -124,7 +123,7 @@ Another option which was considered is the STM32L031 - an excellent low power op
 
 Other platforms like the Espressif ESP32-C3 are used widely in IoT projects, offering Wi-Fi as well as BLE connectivity, more processing power, and cryptography acceleration\cite{b8}, they typically have a much higher power requirement, as much as 130mA while active. Using these in production comes with an increased cost for no benefit and vastly diminishes battery life.
 
-The Adafruit FeatherSense nRF52840\cite{b7} was chosen as a prototyping board for the project. This board provides a microcontroller from the same family as the production microcontroller, and integrates multiple sensors (e.g., accelerometer/gyroscope, magnetometer, microphone, temperature, humidity, and pressure sensors) along with native BLE support. For this project, only the accelerometer and gyroscope were used, as these sensors correspond with the data requirements of the HARTH dataset \cite{b5,b6} powering the activity classifier in the Cloud IoT pipeline.
+The Adafruit FeatherSense nRF52840\cite{b7} was chosen as a prototyping board for the project. This board provides a microcontroller from the same family as the production microcontroller, and integrates multiple sensors (e.g., accelerometer/gyroscope, magnetometer, microphone, temperature, humidity, and pressure sensors) along with native BLE support. For this project, only the accelerometer and gyroscope were used, as these sensors correspond with the data requirements of the HAR using Smartphones dataset \cite{b5,b6} powering the activity classifier in the Cloud IoT pipeline.
 
 \subsection{Gateway}
 For this project, the Raspberry Pi 4 serves as the IoT gateway. The Pi 4 Model B 4GB RAM variant features a Broadcom BCM2711, a System-on-Chip containing a quad-core ARM Cortex-A72 processor. All Pi 4 Model Bs feature LPDDR4 memory running at 3200Mhz. It features on-board 2.4Ghz and 5.0Ghz WiFi, Gigabit Ethernet, Bluetooth 5.0 and BLE 5.0, and a Micro SD card slot. The device consumes a maximum of 15w under load, and takes up quite a small space. With the amount of processing available on-board, and at a cost of only \$60 USD, the Pi 4 is an ideal choice for communicating with, and handling data from a large volume of IoT nodes. The Pi 4 runs a full Linux environment by default but can easily be customized to run a stripped back Linux distribution designed solely to run IoT Gateway functions. As it uses Linux, it natively supports Python for prototyping and C/C++ for production deployments as standard, with a wide variety of libraries available for BLE communication, MQTT for sending data to the cloud, edge machine learning libraries, and much more.
@@ -177,7 +176,7 @@ Verification activities will be designed to ensure that the prototype meets Deli
 
 \section{Implementation}
 \subsection{Feathersense Node Setup}
-For prototyping and software development, the sensor node was implemented using the Adafruit FeatherSense nRF52840 board. The LSM6DS3 IMU was configured to sample at 50Hz, in line with the publicly available HARTH dataset. Sensor readings (acceleration in m/s\textsuperscript{2} and angular velocity in deg/s) were acquired in real time through the Adafruit CircuitPython libraries. 
+For prototyping and software development, the sensor node was implemented using the Adafruit FeatherSense nRF52840 board. The LSM6DS3 IMU was configured to sample at 50Hz, in line with the publicly available HAR Using Smartphones dataset. Sensor readings (acceleration in m/s\textsuperscript{2} and angular velocity in deg/s) were acquired in real time through the Adafruit CircuitPython libraries. 
 
 \subsection{Communication Performance}
 An initial implementation used the Nordic UART Service over BLE, with payloads encoded in CBOR format. This implementation was functional, but very inefficient. The structured CBOR packets were relatively large, so the transmission was slower and there was an increased coding and decoding overhead on both device and gateway. As a result, the effective sampling rate was limited to approximately 11~Hz, and partial reads often caused incomplete or dropped data. The performance was too poor due to the low data rate of the UART, to be considered as an option.
@@ -206,13 +205,16 @@ The graphs shown in Figure \ref{fig:basic_data} were generated by the code outli
 
 \section{Edge/Fog Processing}
 \subsection{Feature Extraction on Raspberry Pi}\label{feature_extraction}
-Jerk calculation (derivative of acceleration).
+Post-processing and feature extraction is performed on the data windows after the incoming data has been filtered and windowed. This feature extraction is designed in line with the feature requirements of the HAR using Smartphones dataset, which requires a large number of input features to classify the current activity, including but not limited to:
+\begin{itemize}
+	\item Window mean for all accelerometer and gyroscope axes
+	\item Window standard deviation for accelerometer and gyroscope axes
+	\item Accelerometer Jerk and Gyrometer Jerk
+	\item Frequency domain equivalents for all above using FFT
+	\item Any many more...
+\end{itemize}
 
-Magnitude of accel/gyro.
-
-Other features relevant for ML (you can mention RMS, variance, etc. if planned).
-
-Show small plots of raw vs processed features.
+The current implementation demonstrates the mean accelerometer values for each axis, and the FFT of each axis being processed on the Raspberry Pi gateway node. The extracted features will collectively be sent to Azure cloud to a machine learning pipeline which will classify the activity being undertaken before storing the data and classification in a time-series database.
 
 \subsection{Feature Extraction Visualisation}
 The graphs shown in Figure \ref{fig:extracted_data} were generated by the code outlined in Section  \ref{feature_extraction}. The exact code used on the Gateway Device can be found in Appendix \ref{gateway_firmware}.
@@ -225,14 +227,12 @@ The graphs shown in Figure \ref{fig:extracted_data} were generated by the code o
 \end{figure}
 
 \section{Discussion \& Conclusion}
-Summary: successful acquisition, transmission, preprocessing.
-
-Limitations: still simulated/early prototype, real-world testing needed.
-
-Next steps (for Deliverable II): deploy ML in cloud, integrate with Power BI.
+The current state of the project successfully demonstrates end-to-end data acquisition, filtering, preprocessing, and feature extraction for the activity tracker system. The BLE-based pipeline can reliably transmit 6-axis IMU data at 50Hz from the Bluefruit Feather Sense, and the calibration and noise filtering system is basic but highly effective. Gathering some visualisations it can be seen that both the raw data collection and basic feature extraction functionality is working properly. However, the current implementation is still an early prototype and has only been tested in a lab environment. Future work on this project will focus on deploying the machine learning classification model in an Azure machine learning environment, and will involve training the model based on the HAR for Smartphones dataset, implementing a real-time inference and data collection pipeline, integrating a Power BI dashboard for monitoring and alerting, and finally real-world testing with real-time data being sent from the IoT node, to the Gateway and finally to the remote data processing pipeline.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
+
+Please see the following pages for appendices.
 
 \onecolumn
 
