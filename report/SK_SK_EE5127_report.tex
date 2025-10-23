@@ -82,7 +82,7 @@ The overall architecture of the IoT system is illustrated in Fig.~\ref{fig:block
 
 \begin{figure}[h]
 	\centering
-	\includegraphics[width=0.5\textwidth]{media/basic_architecture_overview.png}
+	\includegraphics[width=0.9\columnwidth]{media/basic_architecture_overview.png}
 	\caption{Block diagram of the IoT system, showing the layered design from sensing to future cloud integration.}
 	\label{fig:block_diagram}
 \end{figure}
@@ -140,64 +140,43 @@ The Lithium Iron Phosphate Battery in AA size is an ideal choice for the amount 
 
 Other alternatives considered were Lithium Ion and Lithium Polymer batteries, but both solutions are less stable and have a lower energy density than LiFePo4 batteries. For battery management and voltage regulation, the MCP73831 charging IC was considered for many of the same reasons as the nPM1300 - it supports USB-C, a 3.2v nominal battery voltage, automatic charge termination, and status indicators. This, in combination with the TPS62840 buck converter for voltage regulation, which supports converting 6.4v to 3.3v at a 90\% efficiency at the proposed loads, was the original power system designed for the device. Given that both devices could be combined into a single chip with a system-level power watchdog and battery level gauge if the nPM1300 was used, this led to their removal from the design.
 
-For prototyping, the FeatherSense board was powered via USB battery pack, which ensured stability and ease of development.
+For prototyping, the FeatherSense board was powered via USB using a battery pack, which allowed for quick and easy testing after programming the device via USB. 
 
 \section{Prototype Design Plan}
 
 \subsection{Subsystems}
 The prototype will be structured into four main subsystems: 
 \begin{itemize}
-	\item \textbf{Sensing:} inertial data acquisition from the FeatherSense accelerometer and gyroscope. 
-	\item \textbf{Communication:} wireless transmission via BLE, using GATT as the chosen protocol. 
-	\item \textbf{Edge Processing:} real-time data handling and basic feature extraction on the Raspberry Pi 4. 
-	\item \textbf{Visualisation:} plotting of data streams to confirm correct reception and interpretation. 
+	\item \textbf{Sensing:} Inertial data acquisition from the FeatherSense accelerometer and gyroscope. 
+	\item \textbf{Communication:} Wireless transmission via BLE, using GATT as the chosen protocol. 
+	\item \textbf{Edge Processing:} Real-time data handling and basic feature extraction on the Raspberry Pi 4. 
+	\item \textbf{Visualisation:} Plotting of data streams to confirm correct reception and interpretation. 
 \end{itemize}
 This breakdown will ensure that each component of the system can be developed and validated independently before integration. 
 
 \subsection{Integration Plan}
-The system will be developed incrementally. The sensor subsystem will first be validated by confirming raw inertial readings on the FeatherSense. Next, BLE transmission will be tested in isolation before final integration. Finally, the gateway will be configured to receive and interpret packets, after which end to end data flow from sensing to visualisation will be verified. 
-
-
-\textbf{[@Sean: idk really, if you have any thoughts on the above two sections.]}
+The system will be developed incrementally. The sensor subsystem will first be validated by confirming raw inertial readings on the FeatherSense. Next, BLE transmission will be tested in isolation before final integration. This will be followed by configuring the gateway to receive and interpret data packets, after which the noise filtering, data windowing, and feature extraction will be added. Each of these features are tested in isolation with pre-captured data, then integrated into the full application to test its functionality with real-time data. 
 
 \subsection{Verification Plan}
 Verification activities will be designed to ensure that the prototype meets Deliverable~I requirements. The main checks will include:
 \begin{itemize}
-	\item Confirming that BLE transmission achieves the target 50~Hz sampling rate. 
-	\item Ensuring data packets are correctly structured and fully decoded at the gateway. 
-	\item Validating that received sensor values fall within expected physical ranges (e.g., acceleration values near $\pm 9.8~\text{m/s}^2$ for gravity). 
-	\item Measuring packet loss rates to assess communication reliability. 
+	\item Confirming that BLE transmission achieves the target 50~Hz sampling rate
+	\item Ensuring data packets are correctly structured and fully decoded at the gateway
+	\item Validating that received sensor values fall within expected physical ranges (e.g., acceleration values near $\pm 9.8~\text{m/s}^2$ for gravity)
 \end{itemize}
-
-
-\subsection{Verification Plan}
-Verification activities will be designed to ensure that the prototype meets Deliverable~I requirements. The main checks will include:
-\begin{itemize}
-	\item Confirming that BLE transmission achieved the target 50~Hz sampling rate. 
-	\item Ensuring data packets were correctly structured and fully decoded at the gateway. 
-	\item Validating that received sensor values were within expected physical ranges (e.g., acceleration values near $\pm 9.8~\text{m/s}^2$ for gravity). 
-\end{itemize}
-
-\textbf{[@Sean: again, some more stuff here maybe on what we are doing with regards verification. Will need to test packet loss. This verification section is just chatgpt nonsense atm]}
 
 \section{Implementation}
 \subsection{Feathersense Node Setup}
-The sensor node was implemented using the Adafruit FeatherSense nRF52840 board. The LSM6DS3 IMU was configured to sample at 50Hz, in line with the publicly available HARTH dataset. Sensor readings (acceleration in m/s\textsuperscript{2} and angular velocity in deg/s) were acquired in real time through the Adafruit CircuitPython libraries. 
+For prototyping and software development, the sensor node was implemented using the Adafruit FeatherSense nRF52840 board. The LSM6DS3 IMU was configured to sample at 50Hz, in line with the publicly available HARTH dataset. Sensor readings (acceleration in m/s\textsuperscript{2} and angular velocity in deg/s) were acquired in real time through the Adafruit CircuitPython libraries. 
 
 \subsection{Communication Performance}
-An initial implementation used the Nordic UART Service over BLE, with payloads encoded in CBOR format. This implementation was functional, but very inneficient. The structured CBOR packets were relatively large, so the transmission was slower and there was an increased coding and decoding overhead on both device and gateway. As a result, the effective sampling rate was limited to approximately 11~Hz, and partial reads often caused incomplete or dropped data. The performance was too poor to be considered as an option, and further measurements of latency or packet loss were not taken in this configuration. 
+An initial implementation used the Nordic UART Service over BLE, with payloads encoded in CBOR format. This implementation was functional, but very inefficient. The structured CBOR packets were relatively large, so the transmission was slower and there was an increased coding and decoding overhead on both device and gateway. As a result, the effective sampling rate was limited to approximately 11~Hz, and partial reads often caused incomplete or dropped data. The performance was too poor due to the low data rate of the UART, to be considered as an option.
 
 To address the issues found with the UART method, the system was reimplemented using a custom GATT service with two vendor-defined UUIDs (one for the service and one for the sensor characteristic). Instead of transmitting dictionary structures, the new approach packed six 32 bit floating point values (ax, ay, az, gx, gy, gz) into a fixed length 24 byte payload. This enabled stable streaming at the target rate of 50~Hz without the packet corruption or decoding delays observed previously.
 
-\textbf{[TODO: Record and report packet loss statistics in current implementation.]} 
-
-
-
-
 \section{Implementation of Gateway Device}
-\textbf{[@Sean: I'll leave this to you]} 
 \subsection{Data collection on Raspberry Pi}
-connection with Feathersense via BLE GATT.
+The implementation of the Bluetooth Low Energy connection and data retrieval via GATT was implemented using the Bleak Python library, which provides a Bluetooth Scanner and Bluetooth Client. Together, these allow you to first discover all Bluetooth devices advertising in the vicinity, find an address corresponding to an advertised name, and then spawn a Bluetooth Client targetting that address. Bleak also provides a callback service which can trigger a notification handler when a notification arrives from a specific characteristic of a service.
 
 \subsection{Streaming Visualisation}
  live plotting of received sensor data.
