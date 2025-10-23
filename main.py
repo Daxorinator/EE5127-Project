@@ -7,7 +7,7 @@ from collections import deque
 import statistics
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-from threading import Thread
+from threading import Thread, Lock
 import numpy as np
 
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
@@ -20,9 +20,7 @@ NOISE_THRESHOLD = 0.1     # Values below this are considered noise (m/s^2 or dps
 # Windowing settings
 WINDOW_SIZE = 128         # 2.56 seconds at 50 Hz
 WINDOW_STEP = 64          # 50% overlap (step by half the window size)
-
-# Plotting settings
-PLOT_HISTORY = 500        # Number of samples to display in live plot
+SAMPLE_RATE = 50          # Hz
 
 # Configure logging
 logger = logging.getLogger()
@@ -47,25 +45,64 @@ logger.addHandler(console_handler)
 class PlotData:
     """Thread-safe container for plot data"""
     def __init__(self):
-        self.ax_data = deque(maxlen=PLOT_HISTORY)
-        self.ay_data = deque(maxlen=PLOT_HISTORY)
-        self.az_data = deque(maxlen=PLOT_HISTORY)
-        self.gx_data = deque(maxlen=PLOT_HISTORY)
-        self.gy_data = deque(maxlen=PLOT_HISTORY)
-        self.gz_data = deque(maxlen=PLOT_HISTORY)
-        self.timestamps = deque(maxlen=PLOT_HISTORY)
-        self.sample_count = 0
+        self.lock = Lock()
+        
+        # Current window data (only the latest window)
+        self.current_window = None
+        self.window_timestamps = None
+        
+        # Historical window means for trending
+        self.window_means_ax = deque(maxlen=50)  # Keep last 50 windows
+        self.window_means_ay = deque(maxlen=50)
+        self.window_means_az = deque(maxlen=50)
+        self.window_means_gx = deque(maxlen=50)
+        self.window_means_gy = deque(maxlen=50)
+        self.window_means_gz = deque(maxlen=50)
+        self.window_ids = deque(maxlen=50)
+        
+        self.window_count = 0
     
-    def add_sample(self, ax, ay, az, gx, gy, gz):
-        """Add a new sample to the plot data"""
-        self.ax_data.append(ax)
-        self.ay_data.append(ay)
-        self.az_data.append(az)
-        self.gx_data.append(gx)
-        self.gy_data.append(gy)
-        self.gz_data.append(gz)
-        self.timestamps.append(self.sample_count / 50.0)  # Convert to seconds
-        self.sample_count += 1
+    def update_window(self, window_data):
+        """Update with a new complete window"""
+        with self.lock:
+            # Convert window to numpy array
+            window_array = np.array(window_data)
+            self.current_window = window_array
+            self.window_timestamps = np.arange(len(window_data)) / SAMPLE_RATE
+            
+            # Calculate means for this window
+            means = np.mean(window_array, axis=0)
+            self.window_means_ax.append(means[0])
+            self.window_means_ay.append(means[1])
+            self.window_means_az.append(means[2])
+            self.window_means_gx.append(means[3])
+            self.window_means_gy.append(means[4])
+            self.window_means_gz.append(means[5])
+            
+            self.window_ids.append(self.window_count)
+            self.window_count += 1
+    
+    def get_current_window(self):
+        """Get current window data (thread-safe)"""
+        with self.lock:
+            if self.current_window is None:
+                return None, None
+            return self.current_window.copy(), self.window_timestamps.copy()
+    
+    def get_window_means(self):
+        """Get historical window means (thread-safe)"""
+        with self.lock:
+            if len(self.window_ids) == 0:
+                return None
+            return {
+                'ids': list(self.window_ids),
+                'ax': list(self.window_means_ax),
+                'ay': list(self.window_means_ay),
+                'az': list(self.window_means_az),
+                'gx': list(self.window_means_gx),
+                'gy': list(self.window_means_gy),
+                'gz': list(self.window_means_gz)
+            }
 
 # Global plot data
 plot_data = PlotData()
@@ -108,7 +145,6 @@ class SensorProcessor:
         
         self.ax_offset = statistics.mean(ax_samples)
         self.ay_offset = statistics.mean(ay_samples)
-        # For Z-axis accelerometer, offset to remove gravity (9.8 m/s^2)
         self.az_offset = statistics.mean(az_samples)
         self.gx_offset = statistics.mean(gx_samples)
         self.gy_offset = statistics.mean(gy_samples)
@@ -173,45 +209,46 @@ def handle_notification(_, data: bytearray):
         # Process data with calibration and filtering
         ax_f, ay_f, az_f, gx_f, gy_f, gz_f = sensor_processor.process(ax, ay, az, gx, gy, gz)
         
-        # Add to plot data
-        plot_data.add_sample(ax_f, ay_f, az_f, gx_f, gy_f, gz_f)
-        
         # Add to sliding window
         window = sensor_processor.add_to_window(ax_f, ay_f, az_f, gx_f, gy_f, gz_f)
         
-        # If we have a complete window, log it
+        # If we have a complete window, log it and update plot
         if window is not None:
             window_id = (len(sensor_processor.window_buffer) - WINDOW_SIZE) // WINDOW_STEP + 1
             for sample_id, (ax, ay, az, gx, gy, gz) in enumerate(window):
                 logger.info(f"{window_id},{sample_id},{ax:.1f},{ay:.1f},{az:.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
+            
+            # Update plot data with new window
+            plot_data.update_window(window)
     except Exception as e:
         logger.error(f"Decode error: {e}")
 
-def setup_plot():
-    """Setup matplotlib figure and axes"""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 8))
+def setup_plot_window1():
+    """Setup first plotting window - current window raw data"""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    fig.canvas.manager.set_window_title('Window 1: Current Window Data')
     
     # Accelerometer plot
-    line_ax, = ax1.plot([], [], 'r-', label='X', linewidth=1)
-    line_ay, = ax1.plot([], [], 'g-', label='Y', linewidth=1)
-    line_az, = ax1.plot([], [], 'b-', label='Z', linewidth=1)
-    ax1.set_xlim(0, PLOT_HISTORY / 50.0)
+    line_ax, = ax1.plot([], [], 'r-', label='X', linewidth=1.5)
+    line_ay, = ax1.plot([], [], 'g-', label='Y', linewidth=1.5)
+    line_az, = ax1.plot([], [], 'b-', label='Z', linewidth=1.5)
+    ax1.set_xlim(0, WINDOW_SIZE / SAMPLE_RATE)
     ax1.set_ylim(-20, 20)
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Acceleration (m/s²)')
-    ax1.set_title('Accelerometer Data')
+    ax1.set_title('Current Window - Accelerometer Data')
     ax1.legend(loc='upper right')
     ax1.grid(True, alpha=0.3)
     
     # Gyroscope plot
-    line_gx, = ax2.plot([], [], 'r-', label='X', linewidth=1)
-    line_gy, = ax2.plot([], [], 'g-', label='Y', linewidth=1)
-    line_gz, = ax2.plot([], [], 'b-', label='Z', linewidth=1)
-    ax2.set_xlim(0, PLOT_HISTORY / 50.0)
+    line_gx, = ax2.plot([], [], 'r-', label='X', linewidth=1.5)
+    line_gy, = ax2.plot([], [], 'g-', label='Y', linewidth=1.5)
+    line_gz, = ax2.plot([], [], 'b-', label='Z', linewidth=1.5)
+    ax2.set_xlim(0, WINDOW_SIZE / SAMPLE_RATE)
     ax2.set_ylim(-40, 40)
     ax2.set_xlabel('Time (s)')
     ax2.set_ylabel('Angular Velocity (rad/s)')
-    ax2.set_title('Gyroscope Data')
+    ax2.set_title('Current Window - Gyroscope Data')
     ax2.legend(loc='upper right')
     ax2.grid(True, alpha=0.3)
     
@@ -224,42 +261,122 @@ def setup_plot():
     
     return fig, ax1, ax2, lines
 
-def animate(frame, ax1, ax2, lines):
-    """Animation function called by FuncAnimation"""
-    if len(plot_data.timestamps) == 0:
+def setup_plot_window2():
+    """Setup second plotting window - means and FFT"""
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+    fig.canvas.manager.set_window_title('Window 2: Trends and FFT Analysis')
+    
+    # Window means plot
+    line_ax, = ax1.plot([], [], 'r-', label='Accel X', linewidth=1.5, marker='o', markersize=3)
+    line_ay, = ax1.plot([], [], 'g-', label='Accel Y', linewidth=1.5, marker='o', markersize=3)
+    line_az, = ax1.plot([], [], 'b-', label='Accel Z', linewidth=1.5, marker='o', markersize=3)
+    ax1.set_xlabel('Window ID')
+    ax1.set_ylabel('Mean Acceleration (m/s²)')
+    ax1.set_ylim(-20, 20)
+    ax1.set_title('Window Mean Trends - Accelerometer')
+    ax1.legend(loc='upper right')
+    ax1.grid(True, alpha=0.3)
+    
+    # FFT plot
+    line_fft_x, = ax2.plot([], [], 'r-', label='X', linewidth=1.5)
+    line_fft_y, = ax2.plot([], [], 'g-', label='Y', linewidth=1.5)
+    line_fft_z, = ax2.plot([], [], 'b-', label='Z', linewidth=1.5)
+    ax2.set_xlim(0, SAMPLE_RATE / 2)  # Nyquist frequency
+    ax2.set_ylim(0, 10)
+    ax2.set_xlabel('Frequency (Hz)')
+    ax2.set_ylabel('Magnitude')
+    ax2.set_title('FFT - Current Window Accelerometer')
+    ax2.legend(loc='upper right')
+    ax2.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    lines = {
+        'ax': line_ax, 'ay': line_ay, 'az': line_az,
+        'fft_x': line_fft_x, 'fft_y': line_fft_y, 'fft_z': line_fft_z
+    }
+    
+    return fig, ax1, ax2, lines
+
+def animate_window1(frame, ax1, ax2, lines):
+    """Animation function for window 1 - current window data"""
+    window_data, timestamps = plot_data.get_current_window()
+    
+    if window_data is None:
         return lines.values()
     
-    # Convert deques to lists for plotting
-    times = list(plot_data.timestamps)
-    
     # Update accelerometer lines
-    lines['ax'].set_data(times, list(plot_data.ax_data))
-    lines['ay'].set_data(times, list(plot_data.ay_data))
-    lines['az'].set_data(times, list(plot_data.az_data))
+    lines['ax'].set_data(timestamps, window_data[:, 0])
+    lines['ay'].set_data(timestamps, window_data[:, 1])
+    lines['az'].set_data(timestamps, window_data[:, 2])
     
     # Update gyroscope lines
-    lines['gx'].set_data(times, list(plot_data.gx_data))
-    lines['gy'].set_data(times, list(plot_data.gy_data))
-    lines['gz'].set_data(times, list(plot_data.gz_data))
-    
-    # Auto-adjust x-axis to show latest data
-    if len(times) > 0:
-        x_max = times[-1]
-        x_min = max(0, x_max - (PLOT_HISTORY / 50.0))
-        ax1.set_xlim(x_min, x_max)
-        ax2.set_xlim(x_min, x_max)
+    lines['gx'].set_data(timestamps, window_data[:, 3])
+    lines['gy'].set_data(timestamps, window_data[:, 4])
+    lines['gz'].set_data(timestamps, window_data[:, 5])
     
     return lines.values()
 
-def start_plot():
-    """Start matplotlib in a separate thread"""
-    fig, ax1, ax2, lines = setup_plot()
+def animate_window2(frame, ax1, ax2, lines):
+    """Animation function for window 2 - means and FFT"""
+    # Update window means
+    means_data = plot_data.get_window_means()
     
-    # Create animation with 20 FPS (50ms interval)
-    ani = animation.FuncAnimation(
-        fig, animate, 
-        fargs=(ax1, ax2, lines),
-        interval=50,  # 50ms = 20 FPS
+    if means_data is not None:
+        lines['ax'].set_data(means_data['ids'], means_data['ax'])
+        lines['ay'].set_data(means_data['ids'], means_data['ay'])
+        lines['az'].set_data(means_data['ids'], means_data['az'])
+        
+        # Auto-adjust x-axis for means
+        if len(means_data['ids']) > 0:
+            ax1.set_xlim(means_data['ids'][0], means_data['ids'][-1] + 1)
+    
+    # Update FFT
+    window_data, _ = plot_data.get_current_window()
+    
+    if window_data is not None:
+        # Compute FFT for each accelerometer axis
+        fft_x = np.fft.rfft(window_data[:, 0])
+        fft_y = np.fft.rfft(window_data[:, 1])
+        fft_z = np.fft.rfft(window_data[:, 2])
+        
+        # Get frequency bins
+        freqs = np.fft.rfftfreq(len(window_data), 1/SAMPLE_RATE)
+        
+        # Compute magnitudes
+        mag_x = np.abs(fft_x)
+        mag_y = np.abs(fft_y)
+        mag_z = np.abs(fft_z)
+        
+        # Update FFT lines
+        lines['fft_x'].set_data(freqs, mag_x)
+        lines['fft_y'].set_data(freqs, mag_y)
+        lines['fft_z'].set_data(freqs, mag_z)
+        
+        # Auto-adjust y-axis for FFT
+        max_mag = max(np.max(mag_x), np.max(mag_y), np.max(mag_z))
+        ax2.set_ylim(0, max_mag * 1.1)
+    
+    return lines.values()
+
+def start_plots():
+    """Start both matplotlib windows in the main thread"""
+    # Setup window 1
+    fig1, ax1_1, ax2_1, lines1 = setup_plot_window1()
+    ani1 = animation.FuncAnimation(
+        fig1, animate_window1, 
+        fargs=(ax1_1, ax2_1, lines1),
+        interval=100,  # 100ms = 10 FPS
+        blit=True,
+        cache_frame_data=False
+    )
+    
+    # Setup window 2
+    fig2, ax1_2, ax2_2, lines2 = setup_plot_window2()
+    ani2 = animation.FuncAnimation(
+        fig2, animate_window2, 
+        fargs=(ax1_2, ax2_2, lines2),
+        interval=100,  # 100ms = 10 FPS
         blit=True,
         cache_frame_data=False
     )
@@ -268,7 +385,7 @@ def start_plot():
 
 async def main():
     # Start matplotlib in a separate thread
-    plot_thread = Thread(target=start_plot, daemon=True)
+    plot_thread = Thread(target=start_plots, daemon=True)
     plot_thread.start()
     
     logger.info("Scanning for BLE devices...")

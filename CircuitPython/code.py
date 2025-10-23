@@ -1,6 +1,5 @@
 import struct
 import time
-from async_status import LEDController
 import board
 import asyncio
 
@@ -35,9 +34,6 @@ lsm6ds.gyro_data_rate = Rate.RATE_3_33K_HZ
 lsm6ds.accelerometer_range = AccelRange.RANGE_8G
 lsm6ds.gyro_range = GyroRange.RANGE_2000_DPS
 
-led = LEDController()
-blink_task = asyncio.create_task(led.blink())
-
 ble = BLERadio()
 ble.name = "Old Person Life Invader"
 sensor_service = SensorService()
@@ -50,11 +46,8 @@ while True:
     print(f"AccelRange set to: {AccelRange.string[lsm6ds.accelerometer_range]}")
     print(f"GyroRange set to: {GyroRange.string[lsm6ds.gyro_range]}")
     ble.start_advertising(advertisement)
-    while not ble.connected:
-        led.set_color((255, 0, 0))
 
     while ble.connected:
-        led.set_color((0, 255, 0))
         t0 = time.monotonic()
 
         # Read accel + gyro
