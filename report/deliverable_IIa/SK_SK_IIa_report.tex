@@ -1,0 +1,116 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage[table,xcdraw]{xcolor}
+\usepackage{listings}
+
+\lstdefinestyle{pythonstyle}{
+	language=Python,
+	basicstyle=\ttfamily\small,
+	keywordstyle=\color{blue},
+	commentstyle=\color{gray},
+	stringstyle=\color{teal},
+	showstringspaces=false,
+	frame=single
+}
+
+\lstset{style=pythonstyle}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+		T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+	
+	\title{Human Activity Recognition Using Smartphone Sensor Data: Analysis and Classification using Azure ML and Power BI
+	}
+	
+	\author{\IEEEauthorblockN{Séamus Knightly}
+		\IEEEauthorblockA{\textit{1MECE1} \\
+			\textit{University Of Galway}\\
+			Galway, Ireland\\
+			s.knightly1@universityofgalway.ie}
+		\and
+		\IEEEauthorblockN{Seán Kelly}
+		\IEEEauthorblockA{\textit{1MECE1} \\
+			\textit{University Of Galway}\\
+			Galway, Ireland \\
+			s.kelly178@universityofgalway.ie}
+	}
+	
+	\maketitle
+	
+	\begin{abstract}
+		blah blah
+	\end{abstract}
+	
+	\begin{IEEEkeywords}
+		IoT, Remote Patient Monitoring, Accelerometer, Gyroscope, Classification, Assisted Living
+	\end{IEEEkeywords}
+	
+	\section{Introduction}
+	
+	Human Activity Recognition (HAR) is an important area in the domain of machine learning and medical computing. The focus is the identification and classification of human physical activities based on provided sensor data. The data can be collecte by a wide range of devices, from stationary room sensing video or radar that can monitor multiple subjects, to wearable or mobile devices that can monitor individual subjects. HAR has become an important component in applications such as remote patient monitoring and assisted living.  
+	
+	There are a number of large, labelled datasets available for human activity recognition. For this project, the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har} was chosen. This dataset contains sensor data collected from smartphone accelerometers and gyroscopes as 30 participants performed 6 daily activites, such walking, sitting, and standing. The observations are represented by multiple time and frequency features extracted from the motion signals. Sensor signals from the device’s accelerometer and gyroscope were recorded at 50~Hz and processed into 561 time and frequency features.
+	
+	This dataset was chosen over other datasets, such as HARTH dataset \cite{logacjov2021harth} \cite{bach2021classifier} for its simplicity, requiring only 1 worn sensor. And for the simpler set of classifications, which correspond better with scenarios that would arise in a care facility or other healthcare setting.
+	
+	This paper aims to analyse and classify human activities using the UCI HAR dataset by developing and evaluating multiple machine learning models in Azure Machine Learning Studio. Power BI is employed to visualize data characteristics, feature distributions, and model performance metrics. The results provide insights into the role of sensor based data and machine learning in Human Activity Recognition.
+
+	The introductory paper \cite{anguita2013public} demonstrated that a multiclass Support Vector Machine (SVM) model could achieve an overall classification accuracy of 96\% on this dataset, comparable to or exceeding the performance of systems using specialised wearable sensors. Their work highlighted the feasibility of using simpler accelerometer and gyroscope sensors, such as smart phones, as unobtrusive, affordable, and reliable sensing tools for HAR.
+	
+	\section{Dataset Description}
+	
+	\subsection{Dataset Source}
+	
+	\subsection{Feature Overview}
+	
+	\subsection{Data Preparation}
+	
+	\section{Data Analysis}
+	
+	\subsection{Characteristics}
+	
+	\subsection{Trends and Patterns}
+	
+	\section{Feature Comparison}
+	
+	\subsection{Visual Comparison}
+	
+	\subsection{Discussion}
+	
+	\section{Box Plot Analysis}
+	
+	\subsection{Box Plots (or Violin Plots idk change this)}
+	
+	\subsection{Findings}
+	
+	\section{Machine Learning Model Development and Evaluation}
+	
+	\subsection{Single Feature Models}
+	
+	\subsection{Combination of Features}
+	
+	\subsection{All Features}
+	
+	\subsection{Feature Selection Methods}
+	
+	\section{Results Comparison and Discussion}
+	
+	\subsection{Performance Comparison}
+	
+	\subsection{Discussion of Findings}
+	
+	\section{Conclusion}
+	
+	\bibliographystyle{IEEEtran}
+	\bibliography{references}
+
+	
+
+	
+\end{document}
