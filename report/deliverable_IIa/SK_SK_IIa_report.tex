@@ -8,6 +8,9 @@
 \usepackage[table,xcdraw]{xcolor}
 \usepackage{listings}
 
+\usepackage{url}
+\usepackage[colorlinks=true]{hyperref}
+
 \lstdefinestyle{pythonstyle}{
 	language=Python,
 	basicstyle=\ttfamily\small,
@@ -55,7 +58,7 @@
 	
 	Human Activity Recognition (HAR) is an important area in the domain of machine learning and medical computing. The focus is the identification and classification of human physical activities based on provided sensor data. The data can be collecte by a wide range of devices, from stationary room sensing video or radar that can monitor multiple subjects, to wearable or mobile devices that can monitor individual subjects. HAR has become an important component in applications such as remote patient monitoring and assisted living.  
 	
-	There are a number of large, labelled datasets available for human activity recognition. For this project, the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har} was chosen. This dataset contains sensor data collected from smartphone accelerometers and gyroscopes as 30 participants performed 6 daily activites, such walking, sitting, and standing. The observations are represented by multiple time and frequency features extracted from the motion signals. Sensor signals from the device’s accelerometer and gyroscope were recorded at 50~Hz and processed into 561 time and frequency features.
+	There are a number of large, labelled datasets available for human activity recognition. For this project, the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har} was chosen. This dataset contains sensor data collected from smartphone accelerometers and gyroscopes as participants performed activities such walking, sitting, and standing. The observations are represented by multiple time and frequency features extracted from the motion signals. Sensor signals from the device’s accelerometer and gyroscope were recorded at 50~Hz and processed into 561 time and frequency features.
 	
 	This dataset was chosen over other datasets, such as HARTH dataset \cite{logacjov2021harth} \cite{bach2021classifier} for its simplicity, requiring only 1 worn sensor. And for the simpler set of classifications, which correspond better with scenarios that would arise in a care facility or other healthcare setting.
 	
@@ -67,9 +70,53 @@
 	
 	\subsection{Dataset Source}
 	
+	The dataset used in this study is the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har}, first introduced in 2013. It was created as part of a study on human centered computing at the University of Genova and the Universitat Politècnica de Catalunya \cite{anguita2013public}. The dataset consists of sensor data collected from 30 volunteers aged between 19 and 48 years, performing six basic activities of daily living.
+	
+	Each participant carried a Samsung Galaxy S~II smartphone on the waist while performing the activities. The smartphone's embedded triaxial accelerometer and gyroscope were used to capture linear acceleration and angular velocity at a constant sampling rate of 50~Hz. The experiment was carried out in a controlled laboratory environment, with participants following a standardised sequence of activities to ensure consistency across samples. The signals were normalised and bounded within 
+	[1, -1], and each feature vector is also standardised. 
+	
+	The dataset is publicly available from the UCI Machine Learning Repository under an open license. 
+
 	\subsection{Feature Overview}
 	
+	The dataset provides both raw sensor readings and pre-processed feature vectors based on that raw data. Each observation represents a 2.56~second window of sensor data with 50\% overlap between adjacent windows, there are 128 readings per window. From each window, 561 features were extracted from the time and frequency domains.
+	
+	The features include statistical and signal-based measures such as mean, standard deviation, median absolute deviation, signal magnitude area, energy, entropy, interquartile range, and correlation between sensor axes. Frequency-domain features were obtained using Fast Fourier Transform (FFT) on the windowed signals. These features capture important motion characteristics for each activity and are normalized to ensure comparability across subjects and sessions.
+	
+	Each record in the dataset is labeled with one of six activity classes:
+	\begin{itemize}
+		\item Walking
+		\item Walking Upstairs
+		\item Walking Downstairs
+		\item Sitting
+		\item Standing
+		\item Laying
+	\end{itemize}
+	Additionally, subject identifiers (1–30) are included, allowing for subject specific or subject independent analysis.
+
+
 	\subsection{Data Preparation}
+	
+	Prior to model training, a subset of the original dataset features was selected to simplify the analysis and reduce computational overhead. The full UCI HAR dataset contains 561 features derived from both time and frequency transformations. This feature set provides detailed motion characterisation, but it is computationally expensive to process, particularly on the edge in the Rasbperry Pi. 
+	
+	To address this, a representative subset of features was selected, focusing on descriptive statistics (mean, maximum, and minimum values) from the accelerometer and gyroscope signals in both body and gravity components. The retained features include the following categories:
+	
+
+	The retained features include the following categories:
+	\begin{itemize}
+		\item \textbf{Time domain features:} body acceleration, body acceleration jerk, gyroscope, and gyroscope jerk (mean, max, and min for each axis)
+		\item \textbf{Magnitude features:} signal magnitude for acceleration, jerk, and gyroscope signals
+		\item \textbf{Frequency domain features:} selected mean, max, and min values for acceleration, jerk, and gyroscope signals
+	\end{itemize}
+	
+	This reduced dataset comprises 101 variables in total, including 100 descriptive features and one target label representing the activity class. The selected features preserve the essential statistical and dynamic characteristics of human motion while reducing data dimensionality. This reduction improves computational efficiency, especially on the edge where limited processing power and energy consumption are key considerations.
+	
+	Furthermore, the original study \cite{anguita2013public} employed a Support Vector Machine (SVM) classifier, which required extensive pre-processed features to achieve high accuracy. In contrast, this work explores more modern machine learning techniques capable of capturing non-linear relationships and implicit feature interactions. It is therefore expected that the reliance on an extensive set of features is reduced without sacrificing accuracy.
+	
+	On the Azure Machine Learning side, the \texttt{subject} feature was excluded from model training to prevent the classifier from learning participant specific patterns. This ensures that the model generalises to unseen individuals rather than overfitting to sensor characteristics unique to particular subjects.
+	
+	The dataset was then partitioned into training (80\%) and testing (20\%) subsets for model evaluation.
+
 	
 	\section{Data Analysis}
 	
