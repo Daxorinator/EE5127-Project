@@ -5,9 +5,6 @@ import logging
 from bleak import BleakScanner, BleakClient
 from collections import deque
 import statistics
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-from threading import Thread, Lock
 import numpy as np
 
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
@@ -20,92 +17,10 @@ NOISE_THRESHOLD = 0.1     # Values below this are considered noise (m/s^2 or dps
 # Windowing settings
 WINDOW_SIZE = 128         # 2.56 seconds at 50 Hz
 WINDOW_STEP = 64          # 50% overlap (step by half the window size)
-SAMPLE_RATE = 50          # Hz
 
 # Configure logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-
-# Remove any existing handlers
-for handler in logger.handlers[:]:
-    logger.removeHandler(handler)
-
-# Create a custom formatter with no prefix
-csv_formatter = logging.Formatter('%(message)s')
-
-# Create file handler that dumps logged data to CSV
-file_handler = logging.FileHandler('data.csv', mode='w')
-file_handler.setFormatter(csv_formatter)
-logger.addHandler(file_handler)
-
-# Create console handler that outputs normal logs to console
-console_handler = logging.StreamHandler()
-logger.addHandler(console_handler)
-
-class PlotData:
-    """Thread-safe container for plot data"""
-    def __init__(self):
-        self.lock = Lock()
-        
-        # Current window data (only the latest window)
-        self.current_window = None
-        self.window_timestamps = None
-        
-        # Historical window means for trending
-        self.window_means_ax = deque(maxlen=50)  # Keep last 50 windows
-        self.window_means_ay = deque(maxlen=50)
-        self.window_means_az = deque(maxlen=50)
-        self.window_means_gx = deque(maxlen=50)
-        self.window_means_gy = deque(maxlen=50)
-        self.window_means_gz = deque(maxlen=50)
-        self.window_ids = deque(maxlen=50)
-        
-        self.window_count = 0
-    
-    def update_window(self, window_data):
-        """Update with a new complete window"""
-        with self.lock:
-            # Convert window to numpy array
-            window_array = np.array(window_data)
-            self.current_window = window_array
-            self.window_timestamps = np.arange(len(window_data)) / SAMPLE_RATE
-            
-            # Calculate means for this window
-            means = np.mean(window_array, axis=0)
-            self.window_means_ax.append(means[0])
-            self.window_means_ay.append(means[1])
-            self.window_means_az.append(means[2])
-            self.window_means_gx.append(means[3])
-            self.window_means_gy.append(means[4])
-            self.window_means_gz.append(means[5])
-            
-            self.window_ids.append(self.window_count)
-            self.window_count += 1
-    
-    def get_current_window(self):
-        """Get current window data (thread-safe)"""
-        with self.lock:
-            if self.current_window is None:
-                return None, None
-            return self.current_window.copy(), self.window_timestamps.copy()
-    
-    def get_window_means(self):
-        """Get historical window means (thread-safe)"""
-        with self.lock:
-            if len(self.window_ids) == 0:
-                return None
-            return {
-                'ids': list(self.window_ids),
-                'ax': list(self.window_means_ax),
-                'ay': list(self.window_means_ay),
-                'az': list(self.window_means_az),
-                'gx': list(self.window_means_gx),
-                'gy': list(self.window_means_gy),
-                'gz': list(self.window_means_gz)
-            }
-
-# Global plot data
-plot_data = PlotData()
 
 class SensorProcessor:
     def __init__(self):
@@ -207,187 +122,403 @@ def handle_notification(_, data: bytearray):
             return
         
         # Process data with calibration and filtering
-        ax_f, ay_f, az_f, gx_f, gy_f, gz_f = sensor_processor.process(ax, ay, az, gx, gy, gz)
+        ax, ay, az, gx, gy, gz = sensor_processor.process(ax, ay, az, gx, gy, gz)
         
         # Add to sliding window
-        window = sensor_processor.add_to_window(ax_f, ay_f, az_f, gx_f, gy_f, gz_f)
+        window = sensor_processor.add_to_window(ax, ay, az, gx, gy, gz)
         
-        # If we have a complete window, log it and update plot
+        # If we have a complete window, log it and print window data
         if window is not None:
             window_id = (len(sensor_processor.window_buffer) - WINDOW_SIZE) // WINDOW_STEP + 1
-            for sample_id, (ax, ay, az, gx, gy, gz) in enumerate(window):
-                logger.info(f"{window_id},{sample_id},{ax:.1f},{ay:.1f},{az:.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
             
-            # Update plot data with new window
-            plot_data.update_window(window)
+            # Print window summary to terminal
+            print(f"\n{'='*80}")
+            print(f"Window {window_id} - {WINDOW_SIZE} samples (2.56 seconds)")
+            print(f"{'='*80}")
+            
+            # Extract all data for printing statistics
+            ax_values = [s[0] for s in window]
+            ay_values = [s[1] for s in window]
+            az_values = [s[2] for s in window]
+            gx_values = [s[3] for s in window]
+            gy_values = [s[4] for s in window]
+            gz_values = [s[5] for s in window]
+            
+            # Calculate acceleration magnitude (Euclidean norm)
+            accel_mag_values = [(ax**2 + ay**2 + az**2)**0.5 for ax, ay, az in zip(ax_values, ay_values, az_values)]
+            
+            # Calculate gyroscope magnitude (Euclidean norm)
+            gyro_mag_values = [(gx**2 + gy**2 + gz**2)**0.5 for gx, gy, gz in zip(gx_values, gy_values, gz_values)]
+            
+            # Calculate jerk (derivative of acceleration and angular velocity)
+            # Sample rate is ~50 Hz, so delta_t ≈ 0.02 seconds
+            sample_rate = 50.0  # Hz
+            delta_t = 1.0 / sample_rate
+            
+            # Accelerometer jerk: d(acceleration)/dt
+            accel_jx_values = [(ax_values[i+1] - ax_values[i]) / delta_t for i in range(len(ax_values) - 1)]
+            accel_jy_values = [(ay_values[i+1] - ay_values[i]) / delta_t for i in range(len(ay_values) - 1)]
+            accel_jz_values = [(az_values[i+1] - az_values[i]) / delta_t for i in range(len(az_values) - 1)]
+            
+            # Calculate acceleration jerk magnitude (Euclidean norm)
+            accel_jerk_mag_values = [(jx**2 + jy**2 + jz**2)**0.5 for jx, jy, jz in zip(accel_jx_values, accel_jy_values, accel_jz_values)]
+            
+            # Gyroscope jerk: d(angular_velocity)/dt (angular acceleration)
+            gyro_jx_values = [(gx_values[i+1] - gx_values[i]) / delta_t for i in range(len(gx_values) - 1)]
+            gyro_jy_values = [(gy_values[i+1] - gy_values[i]) / delta_t for i in range(len(gy_values) - 1)]
+            gyro_jz_values = [(gz_values[i+1] - gz_values[i]) / delta_t for i in range(len(gz_values) - 1)]
+            
+            # Calculate gyroscope jerk magnitude (Euclidean norm)
+            gyro_jerk_mag_values = [(jx**2 + jy**2 + jz**2)**0.5 for jx, jy, jz in zip(gyro_jx_values, gyro_jy_values, gyro_jz_values)]
+            
+            # Calculate FFT (Fast Fourier Transform) for acceleration data
+            # FFT gives us the frequency domain representation
+            ax_fft = np.fft.fft(ax_values)
+            ay_fft = np.fft.fft(ay_values)
+            az_fft = np.fft.fft(az_values)
+            
+            # Get the frequency bins (only positive frequencies)
+            n = len(ax_values)
+            freq_bins = np.fft.fftfreq(n, d=delta_t)[:n//2]
+            
+            # Get magnitude spectrum (only positive frequencies)
+            ax_magnitude = np.abs(ax_fft)[:n//2]
+            ay_magnitude = np.abs(ay_fft)[:n//2]
+            az_magnitude = np.abs(az_fft)[:n//2]
+            
+            # Find dominant frequencies (where magnitude is significant)
+            # Skip DC component (index 0) and find indices where magnitude > threshold
+            threshold = np.max(ax_magnitude) * 0.1  # 10% of max magnitude
+            ax_dominant_freqs = freq_bins[ax_magnitude > threshold]
+            ay_dominant_freqs = freq_bins[ay_magnitude > threshold]
+            az_dominant_freqs = freq_bins[az_magnitude > threshold]
+            
+            # Calculate FFT (Fast Fourier Transform) for accelerometer jerk data
+            # FFT gives us the frequency domain representation
+            accel_jx_fft = np.fft.fft(accel_jx_values)
+            accel_jy_fft = np.fft.fft(accel_jy_values)
+            accel_jz_fft = np.fft.fft(accel_jz_values)
+            
+            # Get the frequency bins for jerk (only positive frequencies)
+            n_jerk = len(accel_jx_values)
+            freq_bins_jerk = np.fft.fftfreq(n_jerk, d=delta_t)[:n_jerk//2]
+            
+            # Get magnitude spectrum for jerk (only positive frequencies)
+            accel_jx_magnitude = np.abs(accel_jx_fft)[:n_jerk//2]
+            accel_jy_magnitude = np.abs(accel_jy_fft)[:n_jerk//2]
+            accel_jz_magnitude = np.abs(accel_jz_fft)[:n_jerk//2]
+            
+            # Find dominant frequencies for jerk (where magnitude is significant)
+            threshold_jerk = np.max(accel_jx_magnitude) * 0.1  # 10% of max magnitude
+            accel_jx_dominant_freqs = freq_bins_jerk[accel_jx_magnitude > threshold_jerk]
+            accel_jy_dominant_freqs = freq_bins_jerk[accel_jy_magnitude > threshold_jerk]
+            accel_jz_dominant_freqs = freq_bins_jerk[accel_jz_magnitude > threshold_jerk]
+            
+            # Calculate FFT (Fast Fourier Transform) for gyroscope data
+            # FFT gives us the frequency domain representation
+            gx_fft = np.fft.fft(gx_values)
+            gy_fft = np.fft.fft(gy_values)
+            gz_fft = np.fft.fft(gz_values)
+            
+            # Get the frequency bins for gyroscope (only positive frequencies)
+            n_gyro = len(gx_values)
+            freq_bins_gyro = np.fft.fftfreq(n_gyro, d=delta_t)[:n_gyro//2]
+            
+            # Get magnitude spectrum for gyroscope (only positive frequencies)
+            gx_magnitude = np.abs(gx_fft)[:n_gyro//2]
+            gy_magnitude = np.abs(gy_fft)[:n_gyro//2]
+            gz_magnitude = np.abs(gz_fft)[:n_gyro//2]
+            
+            # Find dominant frequencies for gyroscope (where magnitude is significant)
+            threshold_gyro = np.max(gx_magnitude) * 0.1  # 10% of max magnitude
+            gx_dominant_freqs = freq_bins_gyro[gx_magnitude > threshold_gyro]
+            gy_dominant_freqs = freq_bins_gyro[gy_magnitude > threshold_gyro]
+            gz_dominant_freqs = freq_bins_gyro[gz_magnitude > threshold_gyro]
+            
+            # Calculate FFT (Fast Fourier Transform) for acceleration magnitude
+            # FFT gives us the frequency domain representation
+            accel_mag_fft = np.fft.fft(accel_mag_values)
+            
+            # Get the frequency bins for acceleration magnitude (only positive frequencies)
+            n_accel_mag = len(accel_mag_values)
+            freq_bins_accel_mag = np.fft.fftfreq(n_accel_mag, d=delta_t)[:n_accel_mag//2]
+            
+            # Get magnitude spectrum for acceleration magnitude (only positive frequencies)
+            accel_mag_magnitude = np.abs(accel_mag_fft)[:n_accel_mag//2]
+            
+            # Find dominant frequencies for acceleration magnitude (where magnitude is significant)
+            threshold_accel_mag = np.max(accel_mag_magnitude) * 0.1  # 10% of max magnitude
+            accel_mag_dominant_freqs = freq_bins_accel_mag[accel_mag_magnitude > threshold_accel_mag]
+            
+            # Calculate FFT (Fast Fourier Transform) for acceleration jerk magnitude
+            # FFT gives us the frequency domain representation
+            accel_jerk_mag_fft = np.fft.fft(accel_jerk_mag_values)
+            
+            # Get the frequency bins for acceleration jerk magnitude (only positive frequencies)
+            n_accel_jerk_mag = len(accel_jerk_mag_values)
+            freq_bins_accel_jerk_mag = np.fft.fftfreq(n_accel_jerk_mag, d=delta_t)[:n_accel_jerk_mag//2]
+            
+            # Get magnitude spectrum for acceleration jerk magnitude (only positive frequencies)
+            accel_jerk_mag_magnitude = np.abs(accel_jerk_mag_fft)[:n_accel_jerk_mag//2]
+            
+            # Find dominant frequencies for acceleration jerk magnitude (where magnitude is significant)
+            threshold_accel_jerk_mag = np.max(accel_jerk_mag_magnitude) * 0.1  # 10% of max magnitude
+            accel_jerk_mag_dominant_freqs = freq_bins_accel_jerk_mag[accel_jerk_mag_magnitude > threshold_accel_jerk_mag]
+            
+            # Calculate FFT (Fast Fourier Transform) for gyroscope magnitude
+            # FFT gives us the frequency domain representation
+            gyro_mag_fft = np.fft.fft(gyro_mag_values)
+            
+            # Get the frequency bins for gyroscope magnitude (only positive frequencies)
+            n_gyro_mag = len(gyro_mag_values)
+            freq_bins_gyro_mag = np.fft.fftfreq(n_gyro_mag, d=delta_t)[:n_gyro_mag//2]
+            
+            # Get magnitude spectrum for gyroscope magnitude (only positive frequencies)
+            gyro_mag_magnitude = np.abs(gyro_mag_fft)[:n_gyro_mag//2]
+            
+            # Find dominant frequencies for gyroscope magnitude (where magnitude is significant)
+            threshold_gyro_mag = np.max(gyro_mag_magnitude) * 0.1  # 10% of max magnitude
+            gyro_mag_dominant_freqs = freq_bins_gyro_mag[gyro_mag_magnitude > threshold_gyro_mag]
+            
+            # Calculate FFT (Fast Fourier Transform) for gyroscope jerk magnitude
+            # FFT gives us the frequency domain representation
+            gyro_jerk_mag_fft = np.fft.fft(gyro_jerk_mag_values)
+            
+            # Get the frequency bins for gyroscope jerk magnitude (only positive frequencies)
+            n_gyro_jerk_mag = len(gyro_jerk_mag_values)
+            freq_bins_gyro_jerk_mag = np.fft.fftfreq(n_gyro_jerk_mag, d=delta_t)[:n_gyro_jerk_mag//2]
+            
+            # Get magnitude spectrum for gyroscope jerk magnitude (only positive frequencies)
+            gyro_jerk_mag_magnitude = np.abs(gyro_jerk_mag_fft)[:n_gyro_jerk_mag//2]
+            
+            # Find dominant frequencies for gyroscope jerk magnitude (where magnitude is significant)
+            threshold_gyro_jerk_mag = np.max(gyro_jerk_mag_magnitude) * 0.1  # 10% of max magnitude
+            gyro_jerk_mag_dominant_freqs = freq_bins_gyro_jerk_mag[gyro_jerk_mag_magnitude > threshold_gyro_jerk_mag]
+            
+            # Store all features in variables with standardized naming
+            # Time domain - Accelerometer
+            tBodyAcc_mean_X = statistics.mean(ax_values)
+            tBodyAcc_mean_Y = statistics.mean(ay_values)
+            tBodyAcc_mean_Z = statistics.mean(az_values)
+            tBodyAcc_min_X = min(ax_values)
+            tBodyAcc_min_Y = min(ay_values)
+            tBodyAcc_min_Z = min(az_values)
+            tBodyAcc_max_X = max(ax_values)
+            tBodyAcc_max_Y = max(ay_values)
+            tBodyAcc_max_Z = max(az_values)
+            
+            # Time domain - Accelerometer Magnitude
+            tBodyAccMag_mean = statistics.mean(accel_mag_values)
+            tBodyAccMag_min = min(accel_mag_values)
+            tBodyAccMag_max = max(accel_mag_values)
+            
+            # Frequency domain - Accelerometer Magnitude
+            fBodyAccMag_mean = np.mean(accel_mag_dominant_freqs) if len(accel_mag_dominant_freqs) > 0 else 0.0
+            fBodyAccMag_min = np.min(accel_mag_dominant_freqs) if len(accel_mag_dominant_freqs) > 0 else 0.0
+            fBodyAccMag_max = np.max(accel_mag_dominant_freqs) if len(accel_mag_dominant_freqs) > 0 else 0.0
+            
+            # Frequency domain - Accelerometer
+            fBodyAcc_mean_X = np.mean(ax_dominant_freqs) if len(ax_dominant_freqs) > 0 else 0.0
+            fBodyAcc_mean_Y = np.mean(ay_dominant_freqs) if len(ay_dominant_freqs) > 0 else 0.0
+            fBodyAcc_mean_Z = np.mean(az_dominant_freqs) if len(az_dominant_freqs) > 0 else 0.0
+            fBodyAcc_min_X = np.min(ax_dominant_freqs) if len(ax_dominant_freqs) > 0 else 0.0
+            fBodyAcc_min_Y = np.min(ay_dominant_freqs) if len(ay_dominant_freqs) > 0 else 0.0
+            fBodyAcc_min_Z = np.min(az_dominant_freqs) if len(az_dominant_freqs) > 0 else 0.0
+            fBodyAcc_max_X = np.max(ax_dominant_freqs) if len(ax_dominant_freqs) > 0 else 0.0
+            fBodyAcc_max_Y = np.max(ay_dominant_freqs) if len(ay_dominant_freqs) > 0 else 0.0
+            fBodyAcc_max_Z = np.max(az_dominant_freqs) if len(az_dominant_freqs) > 0 else 0.0
+            
+            # Time domain - Accelerometer Jerk
+            tBodyAccJerk_mean_X = statistics.mean(accel_jx_values)
+            tBodyAccJerk_mean_Y = statistics.mean(accel_jy_values)
+            tBodyAccJerk_mean_Z = statistics.mean(accel_jz_values)
+            tBodyAccJerk_min_X = min(accel_jx_values)
+            tBodyAccJerk_min_Y = min(accel_jy_values)
+            tBodyAccJerk_min_Z = min(accel_jz_values)
+            tBodyAccJerk_max_X = max(accel_jx_values)
+            tBodyAccJerk_max_Y = max(accel_jy_values)
+            tBodyAccJerk_max_Z = max(accel_jz_values)
+            
+            # Time domain - Accelerometer Jerk Magnitude
+            tBodyAccJerkMag_mean = statistics.mean(accel_jerk_mag_values)
+            tBodyAccJerkMag_min = min(accel_jerk_mag_values)
+            tBodyAccJerkMag_max = max(accel_jerk_mag_values)
+            
+            # Frequency domain - Accelerometer Jerk Magnitude
+            fBodyAccJerkMag_mean = np.mean(accel_jerk_mag_dominant_freqs) if len(accel_jerk_mag_dominant_freqs) > 0 else 0.0
+            fBodyAccJerkMag_min = np.min(accel_jerk_mag_dominant_freqs) if len(accel_jerk_mag_dominant_freqs) > 0 else 0.0
+            fBodyAccJerkMag_max = np.max(accel_jerk_mag_dominant_freqs) if len(accel_jerk_mag_dominant_freqs) > 0 else 0.0
+            
+            # Frequency domain - Accelerometer Jerk
+            fBodyAccJerk_mean_X = np.mean(accel_jx_dominant_freqs) if len(accel_jx_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_mean_Y = np.mean(accel_jy_dominant_freqs) if len(accel_jy_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_mean_Z = np.mean(accel_jz_dominant_freqs) if len(accel_jz_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_min_X = np.min(accel_jx_dominant_freqs) if len(accel_jx_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_min_Y = np.min(accel_jy_dominant_freqs) if len(accel_jy_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_min_Z = np.min(accel_jz_dominant_freqs) if len(accel_jz_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_max_X = np.max(accel_jx_dominant_freqs) if len(accel_jx_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_max_Y = np.max(accel_jy_dominant_freqs) if len(accel_jy_dominant_freqs) > 0 else 0.0
+            fBodyAccJerk_max_Z = np.max(accel_jz_dominant_freqs) if len(accel_jz_dominant_freqs) > 0 else 0.0
+            
+            # Time domain - Gyroscope
+            tBodyGyro_mean_X = statistics.mean(gx_values)
+            tBodyGyro_mean_Y = statistics.mean(gy_values)
+            tBodyGyro_mean_Z = statistics.mean(gz_values)
+            tBodyGyro_min_X = min(gx_values)
+            tBodyGyro_min_Y = min(gy_values)
+            tBodyGyro_min_Z = min(gz_values)
+            tBodyGyro_max_X = max(gx_values)
+            tBodyGyro_max_Y = max(gy_values)
+            tBodyGyro_max_Z = max(gz_values)
+            
+            # Time domain - Gyroscope Magnitude
+            tBodyGyroMag_mean = statistics.mean(gyro_mag_values)
+            tBodyGyroMag_min = min(gyro_mag_values)
+            tBodyGyroMag_max = max(gyro_mag_values)
+            
+            # Frequency domain - Gyroscope Magnitude
+            fBodyGyroMag_mean = np.mean(gyro_mag_dominant_freqs) if len(gyro_mag_dominant_freqs) > 0 else 0.0
+            fBodyGyroMag_min = np.min(gyro_mag_dominant_freqs) if len(gyro_mag_dominant_freqs) > 0 else 0.0
+            fBodyGyroMag_max = np.max(gyro_mag_dominant_freqs) if len(gyro_mag_dominant_freqs) > 0 else 0.0
+            
+            # Frequency domain - Gyroscope
+            fBodyGyro_mean_X = np.mean(gx_dominant_freqs) if len(gx_dominant_freqs) > 0 else 0.0
+            fBodyGyro_mean_Y = np.mean(gy_dominant_freqs) if len(gy_dominant_freqs) > 0 else 0.0
+            fBodyGyro_mean_Z = np.mean(gz_dominant_freqs) if len(gz_dominant_freqs) > 0 else 0.0
+            fBodyGyro_min_X = np.min(gx_dominant_freqs) if len(gx_dominant_freqs) > 0 else 0.0
+            fBodyGyro_min_Y = np.min(gy_dominant_freqs) if len(gy_dominant_freqs) > 0 else 0.0
+            fBodyGyro_min_Z = np.min(gz_dominant_freqs) if len(gz_dominant_freqs) > 0 else 0.0
+            fBodyGyro_max_X = np.max(gx_dominant_freqs) if len(gx_dominant_freqs) > 0 else 0.0
+            fBodyGyro_max_Y = np.max(gy_dominant_freqs) if len(gy_dominant_freqs) > 0 else 0.0
+            fBodyGyro_max_Z = np.max(gz_dominant_freqs) if len(gz_dominant_freqs) > 0 else 0.0
+            
+            # Time domain - Gyroscope Jerk
+            tBodyGyroJerk_mean_X = statistics.mean(gyro_jx_values)
+            tBodyGyroJerk_mean_Y = statistics.mean(gyro_jy_values)
+            tBodyGyroJerk_mean_Z = statistics.mean(gyro_jz_values)
+            tBodyGyroJerk_min_X = min(gyro_jx_values)
+            tBodyGyroJerk_min_Y = min(gyro_jy_values)
+            tBodyGyroJerk_min_Z = min(gyro_jz_values)
+            tBodyGyroJerk_max_X = max(gyro_jx_values)
+            tBodyGyroJerk_max_Y = max(gyro_jy_values)
+            tBodyGyroJerk_max_Z = max(gyro_jz_values)
+            
+            # Time domain - Gyroscope Jerk Magnitude
+            tBodyGyroJerkMag_mean = statistics.mean(gyro_jerk_mag_values)
+            tBodyGyroJerkMag_min = min(gyro_jerk_mag_values)
+            tBodyGyroJerkMag_max = max(gyro_jerk_mag_values)
+            
+            # Frequency domain - Gyroscope Jerk Magnitude
+            fBodyGyroJerkMag_mean = np.mean(gyro_jerk_mag_dominant_freqs) if len(gyro_jerk_mag_dominant_freqs) > 0 else 0.0
+            fBodyGyroJerkMag_min = np.min(gyro_jerk_mag_dominant_freqs) if len(gyro_jerk_mag_dominant_freqs) > 0 else 0.0
+            fBodyGyroJerkMag_max = np.max(gyro_jerk_mag_dominant_freqs) if len(gyro_jerk_mag_dominant_freqs) > 0 else 0.0
+
+            azure_data = {
+                "Inputs": {
+                    "input1": [
+                    {
+                        "subject": 1,
+                        "activity": 0,
+                        "tBodyAcc-mean()-X": tBodyAcc_mean_X,
+                        "tBodyAcc-mean()-Y": tBodyAcc_mean_Y,
+                        "tBodyAcc-mean()-Z": tBodyAcc_mean_Z,
+                        "tBodyAcc-max()-X": tBodyAcc_max_X,
+                        "tBodyAcc-max()-Y": tBodyAcc_max_Y,
+                        "tBodyAcc-max()-Z": tBodyAcc_max_Z,
+                        "tBodyAcc-min()-X": tBodyAcc_min_X,
+                        "tBodyAcc-min()-Y": tBodyAcc_min_Y,
+                        "tBodyAcc-min()-Z": tBodyAcc_min_Z,
+                        "tBodyAccJerk-mean()-X": tBodyAccJerk_mean_X,
+                        "tBodyAccJerk-mean()-Y": tBodyAccJerk_mean_Y,
+                        "tBodyAccJerk-mean()-Z": tBodyAccJerk_mean_Z,
+                        "tBodyAccJerk-max()-X": tBodyAccJerk_max_X,
+                        "tBodyAccJerk-max()-Y": tBodyAccJerk_max_Y,
+                        "tBodyAccJerk-max()-Z": tBodyAccJerk_max_Z,
+                        "tBodyAccJerk-min()-X": tBodyAccJerk_min_X,
+                        "tBodyAccJerk-min()-Y": tBodyAccJerk_min_Y,
+                        "tBodyAccJerk-min()-Z": tBodyAccJerk_min_Z,
+                        "tBodyGyro-mean()-X": tBodyGyro_mean_X,
+                        "tBodyGyro-mean()-Y": tBodyGyro_mean_Y,
+                        "tBodyGyro-mean()-Z": tBodyGyro_mean_Z,
+                        "tBodyGyro-max()-X": tBodyGyro_max_X,
+                        "tBodyGyro-max()-Y": tBodyGyro_max_Y,
+                        "tBodyGyro-max()-Z": tBodyGyro_max_Z,
+                        "tBodyGyro-min()-X": tBodyGyro_min_X,
+                        "tBodyGyro-min()-Y": tBodyGyro_min_Y,
+                        "tBodyGyro-min()-Z": tBodyGyro_min_Z,
+                        "tBodyGyroJerk-mean()-X": tBodyGyroJerk_mean_X,
+                        "tBodyGyroJerk-mean()-Y": tBodyGyroJerk_mean_Y,
+                        "tBodyGyroJerk-mean()-Z": tBodyGyroJerk_mean_Z,
+                        "tBodyGyroJerk-max()-X": tBodyGyroJerk_max_X,
+                        "tBodyGyroJerk-max()-Y": tBodyGyroJerk_max_Y,
+                        "tBodyGyroJerk-max()-Z": tBodyGyroJerk_max_Z,
+                        "tBodyGyroJerk-min()-X": tBodyGyroJerk_min_X,
+                        "tBodyGyroJerk-min()-Y": tBodyGyroJerk_min_Y,
+                        "tBodyGyroJerk-min()-Z": tBodyGyroJerk_min_Z,
+                        "tBodyAccMag-mean()": tBodyAccMag_mean,
+                        "tBodyAccMag-max()": tBodyAccMag_max,
+                        "tBodyAccMag-min()": tBodyAccMag_min,
+                        "tBodyAccJerkMag-mean()": tBodyAccJerkMag_mean,
+                        "tBodyAccJerkMag-max()": tBodyAccJerkMag_max,
+                        "tBodyAccJerkMag-min()": tBodyAccJerkMag_min,
+                        "tBodyGyroMag-mean()": tBodyGyroMag_mean,
+                        "tBodyGyroMag-max()": tBodyGyroMag_max,
+                        "tBodyGyroMag-min()": tBodyGyroMag_min,
+                        "tBodyGyroJerkMag-mean()": tBodyGyroJerkMag_mean,
+                        "tBodyGyroJerkMag-max()": tBodyGyroJerkMag_max,
+                        "tBodyGyroJerkMag-min()": tBodyGyroJerkMag_min,
+                        "fBodyAcc-mean()-X": fBodyAcc_mean_X,
+                        "fBodyAcc-mean()-Y": fBodyAcc_mean_Y,
+                        "fBodyAcc-mean()-Z": fBodyAcc_mean_Z,
+                        "fBodyAcc-max()-X": fBodyAcc_max_X,
+                        "fBodyAcc-max()-Y": fBodyAcc_max_Y,
+                        "fBodyAcc-max()-Z": fBodyAcc_max_Z,
+                        "fBodyAcc-min()-X": fBodyAcc_min_X,
+                        "fBodyAcc-min()-Y": fBodyAcc_min_Y,
+                        "fBodyAcc-min()-Z": fBodyAcc_min_Z,
+                        "fBodyAccJerk-mean()-X": fBodyAccJerk_mean_X,
+                        "fBodyAccJerk-mean()-Y": fBodyAccJerk_mean_Y,
+                        "fBodyAccJerk-mean()-Z": fBodyAccJerk_mean_Z,
+                        "fBodyAccJerk-max()-X": fBodyAccJerk_max_X,
+                        "fBodyAccJerk-max()-Y": fBodyAccJerk_max_Y,
+                        "fBodyAccJerk-max()-Z": fBodyAccJerk_max_Z,
+                        "fBodyAccJerk-min()-X": fBodyAccJerk_min_X,
+                        "fBodyAccJerk-min()-Y": fBodyAccJerk_min_Y,
+                        "fBodyAccJerk-min()-Z": fBodyAccJerk_min_Z,
+                        "fBodyGyro-mean()-X": fBodyGyro_mean_X,
+                        "fBodyGyro-mean()-Y": fBodyGyro_mean_Y,
+                        "fBodyGyro-mean()-Z": fBodyGyro_mean_Z,
+                        "fBodyGyro-max()-X": fBodyGyro_max_X,
+                        "fBodyGyro-max()-Y": fBodyGyro_max_Y,
+                        "fBodyGyro-max()-Z": fBodyGyro_max_Z,
+                        "fBodyGyro-min()-X": fBodyGyro_min_X,
+                        "fBodyGyro-min()-Y": fBodyGyro_min_Y,
+                        "fBodyGyro-min()-Z": fBodyGyro_min_Z,
+                        "fBodyAccMag-mean()": fBodyAccMag_mean,
+                        "fBodyAccMag-max()": fBodyAccMag_max,
+                        "fBodyAccMag-min()": fBodyAccMag_min,
+                        "fBodyBodyAccJerkMag-mean()": fBodyAccJerkMag_mean,
+                        "fBodyBodyAccJerkMag-max()": fBodyAccJerkMag_max,
+                        "fBodyBodyAccJerkMag-min()": fBodyAccJerkMag_min,
+                        "fBodyBodyGyroMag-mean()": fBodyGyroMag_mean,
+                        "fBodyBodyGyroMag-max()": fBodyGyroMag_max,
+                        "fBodyBodyGyroMag-min()": fBodyGyroMag_min,
+                        "fBodyBodyGyroJerkMag-mean()": fBodyGyroJerkMag_mean,
+                        "fBodyBodyGyroJerkMag-max()": fBodyGyroJerkMag_max,
+                        "fBodyBodyGyroJerkMag-min()": fBodyGyroJerkMag_min
+                    }
+                    ]
+                },
+                "GlobalParameters": {}
+            }
+        
+            # Log individual samples to file
+            # for sample_id, (ax, ay, az, gx, gy, gz) in enumerate(window):
+            #     logger.info(f"{window_id},{sample_id},{ax:.1f},{ay:.1f},{az:.1f},{gx:.1f},{gy:.1f},{gz:.1f}")
     except Exception as e:
         logger.error(f"Decode error: {e}")
 
-def setup_plot_window1():
-    """Setup first plotting window - current window raw data"""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
-    fig.canvas.manager.set_window_title('Window 1: Current Window Data')
-    
-    # Accelerometer plot
-    line_ax, = ax1.plot([], [], 'r-', label='X', linewidth=1.5)
-    line_ay, = ax1.plot([], [], 'g-', label='Y', linewidth=1.5)
-    line_az, = ax1.plot([], [], 'b-', label='Z', linewidth=1.5)
-    ax1.set_xlim(0, WINDOW_SIZE / SAMPLE_RATE)
-    ax1.set_ylim(-20, 20)
-    ax1.set_xlabel('Time (s)')
-    ax1.set_ylabel('Acceleration (m/s²)')
-    ax1.set_title('Current Window - Accelerometer Data')
-    ax1.legend(loc='upper right')
-    ax1.grid(True, alpha=0.3)
-    
-    # Gyroscope plot
-    line_gx, = ax2.plot([], [], 'r-', label='X', linewidth=1.5)
-    line_gy, = ax2.plot([], [], 'g-', label='Y', linewidth=1.5)
-    line_gz, = ax2.plot([], [], 'b-', label='Z', linewidth=1.5)
-    ax2.set_xlim(0, WINDOW_SIZE / SAMPLE_RATE)
-    ax2.set_ylim(-40, 40)
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Angular Velocity (rad/s)')
-    ax2.set_title('Current Window - Gyroscope Data')
-    ax2.legend(loc='upper right')
-    ax2.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    
-    lines = {
-        'ax': line_ax, 'ay': line_ay, 'az': line_az,
-        'gx': line_gx, 'gy': line_gy, 'gz': line_gz
-    }
-    
-    return fig, ax1, ax2, lines
-
-def setup_plot_window2():
-    """Setup second plotting window - means and FFT"""
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
-    fig.canvas.manager.set_window_title('Window 2: Trends and FFT Analysis')
-    
-    # Window means plot
-    line_ax, = ax1.plot([], [], 'r-', label='Accel X', linewidth=1.5, marker='o', markersize=3)
-    line_ay, = ax1.plot([], [], 'g-', label='Accel Y', linewidth=1.5, marker='o', markersize=3)
-    line_az, = ax1.plot([], [], 'b-', label='Accel Z', linewidth=1.5, marker='o', markersize=3)
-    ax1.set_xlabel('Window ID')
-    ax1.set_ylabel('Mean Acceleration (m/s²)')
-    ax1.set_ylim(-20, 20)
-    ax1.set_title('Window Mean Trends - Accelerometer')
-    ax1.legend(loc='upper right')
-    ax1.grid(True, alpha=0.3)
-    
-    # FFT plot
-    line_fft_x, = ax2.plot([], [], 'r-', label='X', linewidth=1.5)
-    line_fft_y, = ax2.plot([], [], 'g-', label='Y', linewidth=1.5)
-    line_fft_z, = ax2.plot([], [], 'b-', label='Z', linewidth=1.5)
-    ax2.set_xlim(0, SAMPLE_RATE / 2)  # Nyquist frequency
-    ax2.set_ylim(0, 10)
-    ax2.set_xlabel('Frequency (Hz)')
-    ax2.set_ylabel('Magnitude')
-    ax2.set_title('FFT - Current Window Accelerometer')
-    ax2.legend(loc='upper right')
-    ax2.grid(True, alpha=0.3)
-    
-    plt.tight_layout()
-    
-    lines = {
-        'ax': line_ax, 'ay': line_ay, 'az': line_az,
-        'fft_x': line_fft_x, 'fft_y': line_fft_y, 'fft_z': line_fft_z
-    }
-    
-    return fig, ax1, ax2, lines
-
-def animate_window1(frame, ax1, ax2, lines):
-    """Animation function for window 1 - current window data"""
-    window_data, timestamps = plot_data.get_current_window()
-    
-    if window_data is None:
-        return lines.values()
-    
-    # Update accelerometer lines
-    lines['ax'].set_data(timestamps, window_data[:, 0])
-    lines['ay'].set_data(timestamps, window_data[:, 1])
-    lines['az'].set_data(timestamps, window_data[:, 2])
-    
-    # Update gyroscope lines
-    lines['gx'].set_data(timestamps, window_data[:, 3])
-    lines['gy'].set_data(timestamps, window_data[:, 4])
-    lines['gz'].set_data(timestamps, window_data[:, 5])
-    
-    return lines.values()
-
-def animate_window2(frame, ax1, ax2, lines):
-    """Animation function for window 2 - means and FFT"""
-    # Update window means
-    means_data = plot_data.get_window_means()
-    
-    if means_data is not None:
-        lines['ax'].set_data(means_data['ids'], means_data['ax'])
-        lines['ay'].set_data(means_data['ids'], means_data['ay'])
-        lines['az'].set_data(means_data['ids'], means_data['az'])
-        
-        # Auto-adjust x-axis for means
-        if len(means_data['ids']) > 0:
-            ax1.set_xlim(means_data['ids'][0], means_data['ids'][-1] + 1)
-    
-    # Update FFT
-    window_data, _ = plot_data.get_current_window()
-    
-    if window_data is not None:
-        # Compute FFT for each accelerometer axis
-        fft_x = np.fft.rfft(window_data[:, 0])
-        fft_y = np.fft.rfft(window_data[:, 1])
-        fft_z = np.fft.rfft(window_data[:, 2])
-        
-        # Get frequency bins
-        freqs = np.fft.rfftfreq(len(window_data), 1/SAMPLE_RATE)
-        
-        # Compute magnitudes
-        mag_x = np.abs(fft_x)
-        mag_y = np.abs(fft_y)
-        mag_z = np.abs(fft_z)
-        
-        # Update FFT lines
-        lines['fft_x'].set_data(freqs, mag_x)
-        lines['fft_y'].set_data(freqs, mag_y)
-        lines['fft_z'].set_data(freqs, mag_z)
-        
-        # Auto-adjust y-axis for FFT
-        max_mag = max(np.max(mag_x), np.max(mag_y), np.max(mag_z))
-        ax2.set_ylim(0, max_mag * 1.1)
-    
-    return lines.values()
-
-def start_plots():
-    """Start both matplotlib windows in the main thread"""
-    # Setup window 1
-    fig1, ax1_1, ax2_1, lines1 = setup_plot_window1()
-    ani1 = animation.FuncAnimation(
-        fig1, animate_window1, 
-        fargs=(ax1_1, ax2_1, lines1),
-        interval=100,  # 100ms = 10 FPS
-        blit=True,
-        cache_frame_data=False
-    )
-    
-    # Setup window 2
-    fig2, ax1_2, ax2_2, lines2 = setup_plot_window2()
-    ani2 = animation.FuncAnimation(
-        fig2, animate_window2, 
-        fargs=(ax1_2, ax2_2, lines2),
-        interval=100,  # 100ms = 10 FPS
-        blit=True,
-        cache_frame_data=False
-    )
-    
-    plt.show()
-
 async def main():
-    # Start matplotlib in a separate thread
-    plot_thread = Thread(target=start_plots, daemon=True)
-    plot_thread.start()
-    
     logger.info("Scanning for BLE devices...")
     devices = await BleakScanner.discover(timeout=5.0)
 
