@@ -7,4 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "adafruit-circuitpython-ble>=8.3.5",
     "cbor2>=5.7.0",
+    "numpy>=2.3.4",
+    "pandas>=2.3.3",
+    "scipy>=1.16.3",
 ]
