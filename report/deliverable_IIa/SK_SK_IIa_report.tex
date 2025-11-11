@@ -93,9 +93,12 @@
 		\item Laying
 	\end{itemize}
 	Additionally, subject identifiers (1–30) are included, allowing for subject specific or subject independent analysis.
+	In the dataset, these activities are encoded numerically as follows: 
+	1–\textit{Walking}, 2–\textit{Walking Upstairs}, 3–\textit{Walking Downstairs}, 
+	4–\textit{Sitting}, 5–\textit{Standing}, and 6–\textit{Laying}.
 
 
-	\subsection{Data Preparation}
+	\subsection{Data Preparation}\label{data_preparation}
 	
 	Prior to model training, a subset of the original dataset features was selected to simplify the analysis and reduce computational overhead. The full UCI HAR dataset contains 561 features derived from both time and frequency transformations. This feature set provides detailed motion characterisation, but it is computationally expensive to process, particularly on the edge in the Rasbperry Pi. 
 	
@@ -120,44 +123,287 @@
 	
 	\section{Data Analysis}
 	
-	\subsection{Characteristics}
+	\subsection{Data Characteristics}
 	
+	The class distribution, illustrated in Fig.~\ref{fig:activity-count}, shows that the dataset is generally well balanced across the six activity categories. Each activity contains roughly a similar number of samples, ensuring that the classification problem is not significantly biased toward any single class.
+	However, two activities, \textit{Walking Upstairs} and \textit{Walking Downstairs}, are slightly underrepresented, with approximately $\approx$1,400 and $\approx$1,500 samples respectively, compared to the remaining activities which range between $\approx$1,700 and $\approx$1,900 samples each. This imbalance is not expected to adversely affect model performance but is worth noting when interpreting classification accuracy across classes.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/activity_count_bar_chart.png}
+		\caption{Distribution of recorded samples across the six activity classes.}
+		\label{fig:activity-count}
+	\end{figure}
+
+	
+	Figure \ref{fig:gyro-acc-scatter} plots the mean gyroscope signal along the X-axis against the corresponding mean accelerometer signal. The data form a horizontally elongated cluster centered near 0.25 on the gyroscope axis and 0 on the accelerometer axis. This indicates that angular velocity varies more widely across activities than linear acceleration. The limited vertical spread reflects the fact that participants do not remain perfectly upright—small postural adjustments introduce minor accelerometer fluctuations around zero.
+	The positive offset of the gyroscope mean likely arises because most activities involve forward body motion, causing a consistent rotational component in the positive X-direction. This bias is expected given the orientation of the device and that half of the dataset involves walking movements. The weak overall correlation confirms that the gyroscope and accelerometer capture distinct motion characteristics.
+
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/scatter_plot_gyro_v_mean.png}
+		\caption{Scatter plot showing the relationship between the mean body gyroscope signal (\texttt{tBodyGyro-mean()-X}) and the mean body acceleration signal (\texttt{tBodyAcc-mean()-X}).}
+		\label{fig:gyro-acc-scatter}
+	\end{figure}
+	
+	Figure~\ref{fig:feature-histograms} shows the distributions of several representative accelerometer and gyroscope mean features. 
+	The features are bounded within $[-1, 1]$, confirming that normalisation was applied to the dataset to remove sensor bias and ensure comparable scaling across variables. 
+	Most distributions are centered near zero, consistent with mean centering of the sensor signals, although slight offsets are visible in some axes due to natural asymmetries in human motion and device orientation. 
+	The histograms verify that the dataset is in a state suitable for machine learning analysis.
+	
+	The frequency-domain gyroscope features (\texttt{fBodyGyro-mean()-X} and \texttt{fBodyGyro-mean()-Z}) in the top left of Fig.~\ref{fig:feature-histograms} display a wedge shaped distribution, in contrast to the more symmetric time domain features. This reflects the characteristics of spectral magnitudes produced by the Fast Fourier Transform.
+	Low frequency components appear more consistently, and high frequency components occur less frequently but with greater variability. 
+
+	The differences show the complementary relationship between time and frequency domain, with time features capturing instantaneous motion and orientation, frequency features show periodicity and energy characteristics. Including both will give the model better information about the motion patterns.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[trim=10 95 10 50,clip,width=\linewidth]{figures/histograms.pdf}
+		\caption{Histograms of representative accelerometer and gyroscope mean features, showing that all sensor readings are centered near zero and lie within the normalized range of $[-1, 1]$.}
+		\label{fig:feature-histograms}
+	\end{figure}
+
 	\subsection{Trends and Patterns}
 	
-	\section{Feature Comparison}
+	Figure~\ref{fig:feature-heatmap} illustrates the mean body acceleration and gyroscope signals across all activities.
+	The mean acceleration values are relatively uniform across classes, reflecting the normalisation of sensor data and the short, steady recording intervals.
+	Subtle variations are visible in the gyroscope means, particularly along the Z-axis, corresponding to torso rotation and orientation differences during activities such as walking or laying.
+	These differences are expected given that the device was worn at the waist, where small postural changes and rotational motion are captured more strongly in the gyroscope signals.
+	Overall, the heatmap confirms that the dataset’s body motion features capture the small variations between activity types.
 	
-	\subsection{Visual Comparison}
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/heatmap.png}
+		\caption{Heatmap of selected mean accelerometer and gyroscope features across activity classes. Dynamic activities show higher mean magnitudes than static postures.}
+		\label{fig:feature-heatmap}
+	\end{figure}
+
 	
-	\subsection{Discussion}
+	\subsection{Feature Comparison}
 	
-	\section{Box Plot Analysis}
+	Figure~\ref{fig:feature-grouped-bar} compares the mean magnitudes of selected motion features across all activity classes. 
+	These features, including the body acceleration magnitude (\texttt{tBodyAccMag-mean()}), gyroscope magnitude (\texttt{tBodyGyroMag-mean()}), and jerk-derived magnitudes, represent the overall intensity of body motion.
 	
-	\subsection{Box Plots (or Violin Plots idk change this)}
+	A separation is visible between dynamic and static activities. 
+	\textit{Walking}, \textit{Walking Upstairs}, and \textit{Walking Downstairs} (classes 1–3) exhibit notably higher magnitude values across all features, indicating stronger overall motion and rotational activity. 
+	Among these, \textit{Walking Downstairs} shows significantly higher jerk magnitudes, reflecting the more abrupt deceleration and impact forces during descent. 
 	
-	\subsection{Findings}
+	In contrast, static postures such as \textit{Sitting}, \textit{Standing}, and \textit{Laying} (classes 4–6) display consistently lower mean magnitudes across all sensors. 
+	The near zero variation among these static classes suggests limited body movement and stable device orientation. 
+	These results confirm that magnitude based features can capture the motion intensity of each activity and give discriminative information for classification.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/feature_grouped_bar.png}
+		\caption{Comparison of mean motion magnitude features across activities. Dynamic activities exhibit higher overall intensity than static postures.}
+		\label{fig:feature-grouped-bar}
+	\end{figure}
+
+	
+	\subsection{Box Plot Analysis}
+	
+	Box plots were generated to compare the distributions of selected features across activity categories (Fig.~\ref{fig:boxplot-accmag}). 
+	The mean body acceleration magnitude (\texttt{tBodyAccMag-mean()}) has a clear separation between static and dynamic activities. 
+	Static postures, \textit{Standing}, \textit{Sitting}, and \textit{Laying}, cluster tightly around $-1$, indicating near zero net body acceleration after gravity removal. 
+	In contrast, dynamic activities (\textit{Walking}, \textit{Walking Upstairs}, and \textit{Walking Downstairs}) show higher medians and broader interquartile ranges, as they have higher motion intensity and variation.
+	
+	For the dynamic categories, \textit{Walking Downstairs} shows the highest median acceleration magnitude, while \textit{Walking Upstairs} has the greatest spread, consistent with the more irregular motion of climbing. 
+	Although this feature alone distinguishes static from dynamic activities, the overlap between static classes (e.g., \textit{Sitting} and \textit{Standing}) suggests that multiple features are required for finer classification.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/boxplot_tBodyAccMag.png}
+		\caption{Box plot of mean body acceleration magnitude (\texttt{tBodyAccMag-mean()}) across activity classes. 
+			Dynamic activities display higher medians and greater variability than static postures, indicating stronger motion dynamics.}
+		\label{fig:boxplot-accmag}
+	\end{figure}
+
+	
+	\subsection{Findings and Discussion}
+	
+	The data analysis highlights several consistent and physically meaningful trends across the dataset. 
+	First, the activity classes are well balanced, ensuring that subsequent classification experiments are not biased toward any single class. 
+	Normalisation has scaled all features within the range $[-1,1]$, removing sensor bias and facilitating comparison across variables. 
+	
+	Feature comparisons show separations between static and dynamic activities across both time and frequency domains. 
+	Accelerometer features mostly capture translational body motion, making them effective for distinguishing movement, while gyroscope features show the rotation, which separates similar locomotion patterns such as \textit{Walking Upstairs} and \textit{Walking Downstairs}. 
+	Frequency features provide extra information about periodicity and energy of movement, which will be useful for classification.
+	
+	Overall, the data analysis confirms that the selected features are as expected, are physically interpretable, and have distinct patterns across activity classes. 
+	These characteristics make the dataset suitable for supervised machine learning models in Azure ML studio.
+
+	
 	
 	\section{Machine Learning Model Development and Evaluation}
 	
+	Machine learning models were developed and evaluated in Microsoft Azure ML Studio using the processed dataset described in Section \ref{data_preparation}. A multi-class classification problem was defined, where the target label corresponds to one of six human activity classes. All models were trained using an 70/30 train–test split, and performance was assessed through the use of the \texttt{Evaluate Model} component in ML Studio.
+	
+	The experiments were conducted according to the project specification.
+	
 	\subsection{Single Feature Models}
+	
+	In the first experiment, 99 models were trained using a single feature each from the dataset. This was done using the \textit{Execute Python Script} component in Azure ML Studio, which was useful to automate the mass training and testing of the models. Logistic Regression was used for all, the code for this can be found in Appendix~\ref{single_feature}
+	
+	The resulting accuracies ranged from $\approx$17\%, roughly equivalent to a random choice, to $\approx$ 52\%, depending on the selected feature. The most informative features were primarily derived from mean accelerometer and gyroscope signals in the time domain, specifically:
+	\texttt{fBodyAcc-max()-X}, \texttt{tGravityAcc-min()-Y}, \texttt{tGravityAcc-mean()-Y},
+	\texttt{tGravityAcc-max()-Y}, \texttt{tBodyAcc-max()-X}, and \texttt{fBodyGyro-max()-X}.
+	These activities had accuracies around $\approx$ 50\%, With Gravity related features being over-represented. This matches the physical expectation however, as these features will distinguish the static and dynamic categories. This instantly gives a boost as it reduces the chance to 1 in 3 on a random choice as 3 of the 6 activities are dynamic.
+	
+	The top-performing single-feature model achieved an accuracy of approximately 52.18\%, using \texttt{fBodyAcc-max()-X}. This indicates that horizontal body acceleration alone carries substantial information about activity state, but cannot independently distinguish similar postures such as \textit{Sitting} and \textit{Standing}. Conversely, frequency-domain features (e.g., \texttt{fBodyAcc-bandsEnergy()}) showed lower individual predictive power, confirming that composite motion characteristics are better captured through combinations of features. Conversely, the worst performing was tBodyAcc-mean()-Y with
+	0.170874
+	
+	The resulting accuracies ranged from $\approx$ 17\%, up to $\approx$ 52\%, depending on the selected feature. The top 6 most informative single features were:
+	\texttt{fBodyAcc-max()-X}, \texttt{tGravityAcc-min()-Y}, \texttt{tGravityAcc-mean()-Y},
+	\texttt{tGravityAcc-max()-Y}, \texttt{tBodyAcc-max()-X}, and \texttt{fBodyGyro-max()-X}.
+	These features achieved accuracies around 50\%, with gravity related features being over-represented.
+	
+	This aligns with the expected physical behaviour of the system. Gravity features separate static postures (such as \textit{Standing}, \textit{Sitting}, and \textit{Laying}) from dynamic movements (\textit{Walking}, \textit{Walking Upstairs}, and \textit{Walking Downstairs}). This binary separation immediately improves the classification likelihood from one in six to approximately one in three by distinguishing motion categories.
+	
+	The top single feature model achieved an accuracy of 52.18\% using \texttt{fBodyAcc-max()-X}, indicating that horizontal body acceleration carries substantial information about activity state. However, it alone cannot resolve fine distinctions between static activities such as \textit{Sitting} and \textit{Standing}.
+	
+	The weakest performing feature was \texttt{tBodyAcc-mean()-Y}, which achieved only 17.1\% accuracy, which is roughly equivalent to random guessing on the 6 activities. This feature likely captures minimal variation between activities because the Y-axis component of linear acceleration is effected by constant gravitational force of the earth when the device is worn on the waist, masking activity dependent dynamics.
+	
+	Overall, the single feature experiment demonstrates that individual sensor channels can contain some discriminative power, but accurate human activity recognition requires the integration of multiple complementary signals capturing both translational and rotational motion characteristics.
 	
 	\subsection{Combination of Features}
 	
+	In the second experiment, a small representative subset of features was used to evaluate how combining motion signals from multiple axes influences classification performance. The selected features represent the mean time domain linear acceleration and angular velocity along the three body axes:
+	
+	\begin{itemize}
+		\item \texttt{tBodyAcc-mean()-X}, \texttt{tBodyAcc-mean()-Y}, \texttt{tBodyAcc-mean()-Z}
+		\item \texttt{tBodyGyro-mean()-X}, \texttt{tBodyGyro-mean()-Y}, \texttt{tBodyGyro-mean()-Z}
+	\end{itemize}
+	
+	These six features were chosen because they correspond directly to the type of raw sensor readings that would be available on a typical IoT edge device. Each measurement represents a mean value of acceleration or angular velocity from the onboard inertial sensors. This configuration therefore simulates a minimal data representation scenario in which only low-dimensional, easily transmitted sensor data are available prior to cloud processing.
+	
+	A \textit{Multiclass Logistic Regression} classifier was trained using this six-dimensional feature set. The resulting model achieved test accuracy, precision, and recall values of approximately 27\%, a poor improvement above random guessing. This relatively poor performance indicates that while these features capture fundamental movement patterns, they do not provide sufficient discriminatory information on their own to differentiate between activities.
+	
+    The limited accuracy can be attributed to several factors. Firstly, mean values omit temporal variation and frequency information that are important for distinguishing activities with similar average motion but different periodic structures, like \textit{Walking Upstairs} and \textit{Walking Downstairs}. Secondly, Logistic Regression, being a linear model, is not able to capture the non-linear interactions between accelerometer and gyroscope signals that make up complex human movements, however, incorporating additional derived features like signal magnitude, minimum and maximum values, and frequency domain statistics, can bring out and encode some of these non-linear relationships, allowing linear models to achieve improved performance without changing the underlying algorithm.
+	
+	This experiment demonstrates that accurate human activity recognition requires both richer feature extraction and potentially more expressive classification algorithms. Non-linear models such as Decision Forests, Support Vector Machines, or Neural Networks are expected to perform better on the same feature subset by capturing interactions that a linear model cannot. These observations motivated the subsequent experiments using expanded feature sets and more complex models.
+	
+
+	
 	\subsection{All Features}
+	
+	In the third experiment, all 99 available features in the dataset were used to train a \textit{Multiclass Logistic Regression} classifier. This configuration represents the upper bound of model performance using the full set of derived accelerometer and gyroscope features, including both time and frequency statistics such as mean, standard deviation, magnitude, and energy. These features better capture the motion characteristics of human activity.
+	
+	The trained model achieved an overall test accuracy of 92.8\%, with Micro Precision and Micro Recall values of 0.928, and Macro Precision and Macro Recall values of approximately 0.931 and 0.930, respectively. These results indicate good performance across all six activity classes.
+	
+	Compared to the previous experiments, the improvement in accuracy demonstrates the importance of including the set of pre-processed features. As discussed previously, the additional features expose the non-linear relationships in the motion signals.
+	
+	This experiment highlights that high performance can be achieved even with a relatively simple classification algorithm when a sufficiently rich feature set is provided. In IoT, this emphasises the benefit of performing lightweight feature extraction either on the gateway or in the cloud, rather than attempting classification directly on limited raw sensor data at the edge.
 	
 	\subsection{Feature Selection Methods}
 	
+	To reduce dimensionality and identify the most informative features, three selection techniques were evaluated in Azure ML Studio: \textit{Permutation Feature Importance}, and \textit{Filter Based Feature Selection} using the \textit{Pearson Correlation} and \textit{Chi-Squared} criteria (using a \texttt{Permutation Feature Importance} component and \texttt{Filter Based Feature Selection} components) Each method was followed by model retraining to assess its effect on performance.
+	
+	\textbf{Permutation Feature Importance (PFI)} was applied using a trained \textit{Multiclass Decision Forest}, achieving an accuracy of 96.1\%. The most influential features included \texttt{tGravityAcc-min()-X}, \texttt{tGravityAcc-min()-Y}, \texttt{tBodyAcc-max()-X}, and \texttt{fBodyAccMag-max()}.
+	
+	Using \textbf{Filter-Based Selection}, the \textit{Pearson Correlation} method selected ten features with the highest linear correlation to activity class, achieving 59.6\% accuracy. In contrast, the \textit{Chi-Squared} method achieved a higher accuracy of 81.7\%, identifying both time and frequency domain features such as \texttt{tBodyAcc-max()-X}, \texttt{tGravityAccMag-max()}, and \texttt{fBodyAccMag-mean()} as most relevant.
+	
+	A summary of results is given in Table~\ref{tab:feature-selection-results}. The PFI method with a Decision Forest provided the best overall accuracy. Chi-Squared filtering offered a good compromise between simplicity and accuracy, making it suitable for resource limited IoT applications.
+	
+	\begin{table}[t]
+		\caption{Feature selection method performance summary.}
+		\label{tab:feature-selection-results}
+		\centering
+		\begin{tabular}{|l|c|}
+			\hline
+			\textbf{Method} & \textbf{Accuracy (\%)} \\ \hline
+			Permutation Feature Importance (Decision Forest) & 96.1 \\ \hline
+			Filter Based (Pearson Correlation) & 59.6 \\ \hline
+			Filter Based (Chi-Squared) & 81.7 \\ \hline
+		\end{tabular}
+	\end{table}
+
+	
+	
 	\section{Results Comparison and Discussion}
 	
-	\subsection{Performance Comparison}
+	Table~\ref{tab:comparison-summary} summarises the performance of all experiments conducted in Azure ML Studio. The progression from single features to the full feature set demonstrates a clear relationship between feature richness, model complexity, and classification accuracy.
 	
-	\subsection{Discussion of Findings}
+	\begin{table}[t]
+		\caption{Summary of model performance across all experiments.}
+		\label{tab:comparison-summary}
+		\centering
+		\begin{tabular}{|l|c|}
+			\hline
+			\textbf{Model / Feature Set} & \textbf{Accuracy (\%)} \\ \hline
+			Single Feature (best: \texttt{fBodyAcc-max()-X}) & 52.2 \\ \hline
+			Six Mean Features (Accelerometer + Gyroscope) & 27.0 \\ \hline
+			All 99 Features (Logistic Regression) & 92.8 \\ \hline
+			Filter Based (Pearson Correlation) & 59.6 \\ \hline
+			Filter Based (Chi-Squared) & 81.7 \\ \hline
+			Permutation Feature Importance (Decision Forest) & 96.1 \\ \hline
+		\end{tabular}
+	\end{table}
 	
-	\section{Conclusion}
+	The single-feature and small-subset experiments highlight that limited raw sensor data provide only partial information about human activity. Individual features could distinguish static from dynamic motion but failed to capture finer variations between activities such as \textit{Walking Upstairs} and \textit{Walking Downstairs}. The poor accuracy of the six-feature model (27\%) reinforces this limitation and reflects the reduced representational power of mean values that discard temporal and frequency variation.
+	
+	In contrast, the full feature model achieved 92.8\% accuracy, showing that the engineered features available in the dataset significantly improve separability. Derived statistical, magnitude, and frequency-domain attributes expose latent non-linear relationships that even a linear classifier like Logistic Regression can exploit. This demonstrates that well-designed feature extraction can compensate for model simplicity.
+	
+	The feature-selection experiments further confirmed this relationship. The Chi-Squared filter retained the most relevant subset of features, achieving 81.7\% accuracy—close to the full model but with much lower dimensionality. The Pearson correlation filter, limited to linear dependencies, performed poorly at 59.6\%. The Permutation Feature Importance method, evaluated using a Decision Forest, produced the highest overall accuracy (96.1\%), reflecting the capability of ensemble models to capture non-linear feature interactions without explicit feature engineering.
+	
+	From an IoT system design perspective, these results highlight several key trade-offs:
+	\begin{itemize}
+		\item \textbf{Edge vs. Cloud Processing:} Lightweight models on raw sensor data achieve limited accuracy and are suitable only for coarse classification. More complex processing, including feature extraction and model inference, should be offloaded to a cloud platform or high-performance gateway to achieve reliable recognition.
+		\item \textbf{Feature Dimensionality:} While the full 99-feature model delivers high accuracy, feature selection can substantially reduce computation and bandwidth costs with minimal performance loss—important for constrained IoT deployments.
+		\item \textbf{Model Choice:} Linear models such as Logistic Regression are interpretable and efficient but limited in expressiveness. Non-linear models like Decision Forests or Neural Networks provide superior performance at the cost of higher computational load.
+	\end{itemize}
+	
+	Overall, the experiments demonstrate that high classification accuracy in Human Activity Recognition depends primarily on the availability of informative features. Combining moderate feature selection with non-linear classifiers offers an optimal balance between computational efficiency and predictive accuracy, aligning with the design goals of scalable IoT systems.
+
+
 	
 	\bibliographystyle{IEEEtran}
 	\bibliography{references}
+	
+	\onecolumn
+	\appendices
+	\section{Script Used for Single Feature Evaluation in \texttt{Exectute Python Script} Component}\label{single_feature}
+	\begin{lstlisting}[language=Python]
+	import pandas as pd
+	from sklearn.model_selection import train_test_split
+	from sklearn.linear_model import LogisticRegression
+	from sklearn.metrics import accuracy_score
+	
+	# The script MUST contain a function named azureml_main
+	# which is the entry point for this module.
 
 	
-
+	# The entry point function MUST have two input arguments.
+	# If the input port is not connected, the corresponding
+	# dataframe argument will be None.
+	#   Param<dataframe1>: a pandas.DataFrame
+	#   Param<dataframe2>: a pandas.DataFrame
+	def azureml_main(dataframe1 = None, dataframe2 = None):
 	
+	df = dataframe1.copy() # copy dataset
+	y = df['activity'] # activity is the category
+	X = df.drop(columns=['activity']) # Dataset
+	
+	results = []
+	
+	# iterate over the features available
+	for feature in X.columns: 
+		X_single = X[[feature]]
+		X_train, X_test, y_train, y_test = train_test_split(
+			X_single, y, test_size=0.2, random_state=42
+		)
+		# Train a logistic regression model
+		model = LogisticRegression(max_iter=1000)
+		model.fit(X_train, y_train)
+		# grab the accuracy
+		acc = accuracy_score(y_test, model.predict(X_test))
+		results.append({'Feature': feature, 'Accuracy': acc})
+	
+	results_df = pd.DataFrame(results).sort_values(by='Accuracy', ascending=False)
+	
+	# output the results dataframe
+	return results_df,
+	
+	
+	\end{lstlisting}
+
 \end{document}
