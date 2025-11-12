@@ -6,7 +6,13 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "adafruit-circuitpython-ble>=8.3.5",
+    "azure-iot-device>=2.14.0",
     "cbor2>=5.7.0",
+    "ipykernel>=7.1.0",
+    "ipython>=9.7.0",
+    "jupyter-client>=8.6.3",
+    "jupyter-core>=5.9.1",
+    "matplotlib>=3.10.7",
     "numpy>=2.3.4",
     "pandas>=2.3.3",
     "scipy>=1.16.3",

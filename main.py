@@ -2,14 +2,21 @@ import asyncio
 import struct
 import io
 import logging
+import json
+import os
 from bleak import BleakScanner, BleakClient
 from collections import deque
 import statistics
 import numpy as np
 from normalization_params import normalize_feature
+from azure.iot.device.aio import IoTHubDeviceClient
+from azure.iot.device.iothub import Message
 
 SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 CHAR_UUID    = "12345678-1234-5678-1234-56789abcdef1"
+
+# Azure IoT Hub connection string (load from environment variable for security)
+AZURE_IOT_CONNECTION_STRING = ""
 
 # Calibration settings
 CALIBRATION_SAMPLES = 50  # Number of samples to average for calibration
@@ -110,6 +117,35 @@ class SensorProcessor:
 
 # Global sensor processor
 sensor_processor = SensorProcessor()
+
+# Global Azure IoT Hub client
+iot_hub_client = None
+
+async def send_to_azure_iot_hub(data):
+    """Send data to Azure IoT Hub"""
+    global iot_hub_client
+    
+    if iot_hub_client is None:
+        logger.warning("Azure IoT Hub client not initialized, skipping data send")
+        return
+    
+    try:
+        # Convert data dictionary to JSON string
+        json_string = json.dumps(data)
+        
+        # Create message with JSON string as body
+        message = Message(json_string)
+        
+        # Set content type and encoding so Power BI knows it's JSON
+        message.content_type = "application/json"
+        message.content_encoding = "utf-8"
+        
+        # Send message to IoT Hub
+        await iot_hub_client.send_message(message)
+        logger.info("Successfully sent data to Azure IoT Hub")
+        
+    except Exception as e:
+        logger.error(f"Failed to send data to Azure IoT Hub: {e}")
 
 def handle_notification(_, data: bytearray):
     try:
@@ -421,103 +457,100 @@ def handle_notification(_, data: bytearray):
 
             # Normalize all features using the training data parameters
             azure_data = {
-                "Inputs": {
-                    "input1": [
-                    {
-                        "subject": 1,
-                        "activity": 0,
-                        "tBodyAcc-mean()-X": normalize_feature(tBodyAcc_mean_X, "tBodyAcc-mean()-X"),
-                        "tBodyAcc-mean()-Y": normalize_feature(tBodyAcc_mean_Y, "tBodyAcc-mean()-Y"),
-                        "tBodyAcc-mean()-Z": normalize_feature(tBodyAcc_mean_Z, "tBodyAcc-mean()-Z"),
-                        "tBodyAcc-max()-X": normalize_feature(tBodyAcc_max_X, "tBodyAcc-max()-X"),
-                        "tBodyAcc-max()-Y": normalize_feature(tBodyAcc_max_Y, "tBodyAcc-max()-Y"),
-                        "tBodyAcc-max()-Z": normalize_feature(tBodyAcc_max_Z, "tBodyAcc-max()-Z"),
-                        "tBodyAcc-min()-X": normalize_feature(tBodyAcc_min_X, "tBodyAcc-min()-X"),
-                        "tBodyAcc-min()-Y": normalize_feature(tBodyAcc_min_Y, "tBodyAcc-min()-Y"),
-                        "tBodyAcc-min()-Z": normalize_feature(tBodyAcc_min_Z, "tBodyAcc-min()-Z"),
-                        "tBodyAccJerk-mean()-X": normalize_feature(tBodyAccJerk_mean_X, "tBodyAccJerk-mean()-X"),
-                        "tBodyAccJerk-mean()-Y": normalize_feature(tBodyAccJerk_mean_Y, "tBodyAccJerk-mean()-Y"),
-                        "tBodyAccJerk-mean()-Z": normalize_feature(tBodyAccJerk_mean_Z, "tBodyAccJerk-mean()-Z"),
-                        "tBodyAccJerk-max()-X": normalize_feature(tBodyAccJerk_max_X, "tBodyAccJerk-max()-X"),
-                        "tBodyAccJerk-max()-Y": normalize_feature(tBodyAccJerk_max_Y, "tBodyAccJerk-max()-Y"),
-                        "tBodyAccJerk-max()-Z": normalize_feature(tBodyAccJerk_max_Z, "tBodyAccJerk-max()-Z"),
-                        "tBodyAccJerk-min()-X": normalize_feature(tBodyAccJerk_min_X, "tBodyAccJerk-min()-X"),
-                        "tBodyAccJerk-min()-Y": normalize_feature(tBodyAccJerk_min_Y, "tBodyAccJerk-min()-Y"),
-                        "tBodyAccJerk-min()-Z": normalize_feature(tBodyAccJerk_min_Z, "tBodyAccJerk-min()-Z"),
-                        "tBodyGyro-mean()-X": normalize_feature(tBodyGyro_mean_X, "tBodyGyro-mean()-X"),
-                        "tBodyGyro-mean()-Y": normalize_feature(tBodyGyro_mean_Y, "tBodyGyro-mean()-Y"),
-                        "tBodyGyro-mean()-Z": normalize_feature(tBodyGyro_mean_Z, "tBodyGyro-mean()-Z"),
-                        "tBodyGyro-max()-X": normalize_feature(tBodyGyro_max_X, "tBodyGyro-max()-X"),
-                        "tBodyGyro-max()-Y": normalize_feature(tBodyGyro_max_Y, "tBodyGyro-max()-Y"),
-                        "tBodyGyro-max()-Z": normalize_feature(tBodyGyro_max_Z, "tBodyGyro-max()-Z"),
-                        "tBodyGyro-min()-X": normalize_feature(tBodyGyro_min_X, "tBodyGyro-min()-X"),
-                        "tBodyGyro-min()-Y": normalize_feature(tBodyGyro_min_Y, "tBodyGyro-min()-Y"),
-                        "tBodyGyro-min()-Z": normalize_feature(tBodyGyro_min_Z, "tBodyGyro-min()-Z"),
-                        "tBodyGyroJerk-mean()-X": normalize_feature(tBodyGyroJerk_mean_X, "tBodyGyroJerk-mean()-X"),
-                        "tBodyGyroJerk-mean()-Y": normalize_feature(tBodyGyroJerk_mean_Y, "tBodyGyroJerk-mean()-Y"),
-                        "tBodyGyroJerk-mean()-Z": normalize_feature(tBodyGyroJerk_mean_Z, "tBodyGyroJerk-mean()-Z"),
-                        "tBodyGyroJerk-max()-X": normalize_feature(tBodyGyroJerk_max_X, "tBodyGyroJerk-max()-X"),
-                        "tBodyGyroJerk-max()-Y": normalize_feature(tBodyGyroJerk_max_Y, "tBodyGyroJerk-max()-Y"),
-                        "tBodyGyroJerk-max()-Z": normalize_feature(tBodyGyroJerk_max_Z, "tBodyGyroJerk-max()-Z"),
-                        "tBodyGyroJerk-min()-X": normalize_feature(tBodyGyroJerk_min_X, "tBodyGyroJerk-min()-X"),
-                        "tBodyGyroJerk-min()-Y": normalize_feature(tBodyGyroJerk_min_Y, "tBodyGyroJerk-min()-Y"),
-                        "tBodyGyroJerk-min()-Z": normalize_feature(tBodyGyroJerk_min_Z, "tBodyGyroJerk-min()-Z"),
-                        "tBodyAccMag-mean()": normalize_feature(tBodyAccMag_mean, "tBodyAccMag-mean()"),
-                        "tBodyAccMag-max()": normalize_feature(tBodyAccMag_max, "tBodyAccMag-max()"),
-                        "tBodyAccMag-min()": normalize_feature(tBodyAccMag_min, "tBodyAccMag-min()"),
-                        "tBodyAccJerkMag-mean()": normalize_feature(tBodyAccJerkMag_mean, "tBodyAccJerkMag-mean()"),
-                        "tBodyAccJerkMag-max()": normalize_feature(tBodyAccJerkMag_max, "tBodyAccJerkMag-max()"),
-                        "tBodyAccJerkMag-min()": normalize_feature(tBodyAccJerkMag_min, "tBodyAccJerkMag-min()"),
-                        "tBodyGyroMag-mean()": normalize_feature(tBodyGyroMag_mean, "tBodyGyroMag-mean()"),
-                        "tBodyGyroMag-max()": normalize_feature(tBodyGyroMag_max, "tBodyGyroMag-max()"),
-                        "tBodyGyroMag-min()": normalize_feature(tBodyGyroMag_min, "tBodyGyroMag-min()"),
-                        "tBodyGyroJerkMag-mean()": normalize_feature(tBodyGyroJerkMag_mean, "tBodyGyroJerkMag-mean()"),
-                        "tBodyGyroJerkMag-max()": normalize_feature(tBodyGyroJerkMag_max, "tBodyGyroJerkMag-max()"),
-                        "tBodyGyroJerkMag-min()": normalize_feature(tBodyGyroJerkMag_min, "tBodyGyroJerkMag-min()"),
-                        "fBodyAcc-mean()-X": normalize_feature(fBodyAcc_mean_X, "fBodyAcc-mean()-X"),
-                        "fBodyAcc-mean()-Y": normalize_feature(fBodyAcc_mean_Y, "fBodyAcc-mean()-Y"),
-                        "fBodyAcc-mean()-Z": normalize_feature(fBodyAcc_mean_Z, "fBodyAcc-mean()-Z"),
-                        "fBodyAcc-max()-X": normalize_feature(fBodyAcc_max_X, "fBodyAcc-max()-X"),
-                        "fBodyAcc-max()-Y": normalize_feature(fBodyAcc_max_Y, "fBodyAcc-max()-Y"),
-                        "fBodyAcc-max()-Z": normalize_feature(fBodyAcc_max_Z, "fBodyAcc-max()-Z"),
-                        "fBodyAcc-min()-X": normalize_feature(fBodyAcc_min_X, "fBodyAcc-min()-X"),
-                        "fBodyAcc-min()-Y": normalize_feature(fBodyAcc_min_Y, "fBodyAcc-min()-Y"),
-                        "fBodyAcc-min()-Z": normalize_feature(fBodyAcc_min_Z, "fBodyAcc-min()-Z"),
-                        "fBodyAccJerk-mean()-X": normalize_feature(fBodyAccJerk_mean_X, "fBodyAccJerk-mean()-X"),
-                        "fBodyAccJerk-mean()-Y": normalize_feature(fBodyAccJerk_mean_Y, "fBodyAccJerk-mean()-Y"),
-                        "fBodyAccJerk-mean()-Z": normalize_feature(fBodyAccJerk_mean_Z, "fBodyAccJerk-mean()-Z"),
-                        "fBodyAccJerk-max()-X": normalize_feature(fBodyAccJerk_max_X, "fBodyAccJerk-max()-X"),
-                        "fBodyAccJerk-max()-Y": normalize_feature(fBodyAccJerk_max_Y, "fBodyAccJerk-max()-Y"),
-                        "fBodyAccJerk-max()-Z": normalize_feature(fBodyAccJerk_max_Z, "fBodyAccJerk-max()-Z"),
-                        "fBodyAccJerk-min()-X": normalize_feature(fBodyAccJerk_min_X, "fBodyAccJerk-min()-X"),
-                        "fBodyAccJerk-min()-Y": normalize_feature(fBodyAccJerk_min_Y, "fBodyAccJerk-min()-Y"),
-                        "fBodyAccJerk-min()-Z": normalize_feature(fBodyAccJerk_min_Z, "fBodyAccJerk-min()-Z"),
-                        "fBodyGyro-mean()-X": normalize_feature(fBodyGyro_mean_X, "fBodyGyro-mean()-X"),
-                        "fBodyGyro-mean()-Y": normalize_feature(fBodyGyro_mean_Y, "fBodyGyro-mean()-Y"),
-                        "fBodyGyro-mean()-Z": normalize_feature(fBodyGyro_mean_Z, "fBodyGyro-mean()-Z"),
-                        "fBodyGyro-max()-X": normalize_feature(fBodyGyro_max_X, "fBodyGyro-max()-X"),
-                        "fBodyGyro-max()-Y": normalize_feature(fBodyGyro_max_Y, "fBodyGyro-max()-Y"),
-                        "fBodyGyro-max()-Z": normalize_feature(fBodyGyro_max_Z, "fBodyGyro-max()-Z"),
-                        "fBodyGyro-min()-X": normalize_feature(fBodyGyro_min_X, "fBodyGyro-min()-X"),
-                        "fBodyGyro-min()-Y": normalize_feature(fBodyGyro_min_Y, "fBodyGyro-min()-Y"),
-                        "fBodyGyro-min()-Z": normalize_feature(fBodyGyro_min_Z, "fBodyGyro-min()-Z"),
-                        "fBodyAccMag-mean()": normalize_feature(fBodyAccMag_mean, "fBodyAccMag-mean()"),
-                        "fBodyAccMag-max()": normalize_feature(fBodyAccMag_max, "fBodyAccMag-max()"),
-                        "fBodyAccMag-min()": normalize_feature(fBodyAccMag_min, "fBodyAccMag-min()"),
-                        "fBodyBodyAccJerkMag-mean()": normalize_feature(fBodyAccJerkMag_mean, "fBodyBodyAccJerkMag-mean()"),
-                        "fBodyBodyAccJerkMag-max()": normalize_feature(fBodyAccJerkMag_max, "fBodyBodyAccJerkMag-max()"),
-                        "fBodyBodyAccJerkMag-min()": normalize_feature(fBodyAccJerkMag_min, "fBodyBodyAccJerkMag-min()"),
-                        "fBodyBodyGyroMag-mean()": normalize_feature(fBodyGyroMag_mean, "fBodyBodyGyroMag-mean()"),
-                        "fBodyBodyGyroMag-max()": normalize_feature(fBodyGyroMag_max, "fBodyBodyGyroMag-max()"),
-                        "fBodyBodyGyroMag-min()": normalize_feature(fBodyGyroMag_min, "fBodyBodyGyroMag-min()"),
-                        "fBodyBodyGyroJerkMag-mean()": normalize_feature(fBodyGyroJerkMag_mean, "fBodyBodyGyroJerkMag-mean()"),
-                        "fBodyBodyGyroJerkMag-max()": normalize_feature(fBodyGyroJerkMag_max, "fBodyBodyGyroJerkMag-max()"),
-                        "fBodyBodyGyroJerkMag-min()": normalize_feature(fBodyGyroJerkMag_min, "fBodyBodyGyroJerkMag-min()")
-                    }
-                    ]
-                },
-                "GlobalParameters": {}
+                "activity": 420,
+                "tBodyAcc-mean()-X": normalize_feature(tBodyAcc_mean_X, "tBodyAcc-mean()-X"),
+                "tBodyAcc-mean()-Y": normalize_feature(tBodyAcc_mean_Y, "tBodyAcc-mean()-Y"),
+                "tBodyAcc-mean()-Z": normalize_feature(tBodyAcc_mean_Z, "tBodyAcc-mean()-Z"),
+                "tBodyAcc-max()-X": normalize_feature(tBodyAcc_max_X, "tBodyAcc-max()-X"),
+                "tBodyAcc-max()-Y": normalize_feature(tBodyAcc_max_Y, "tBodyAcc-max()-Y"),
+                "tBodyAcc-max()-Z": normalize_feature(tBodyAcc_max_Z, "tBodyAcc-max()-Z"),
+                "tBodyAcc-min()-X": normalize_feature(tBodyAcc_min_X, "tBodyAcc-min()-X"),
+                "tBodyAcc-min()-Y": normalize_feature(tBodyAcc_min_Y, "tBodyAcc-min()-Y"),
+                "tBodyAcc-min()-Z": normalize_feature(tBodyAcc_min_Z, "tBodyAcc-min()-Z"),
+                "tBodyAccJerk-mean()-X": normalize_feature(tBodyAccJerk_mean_X, "tBodyAccJerk-mean()-X"),
+                "tBodyAccJerk-mean()-Y": normalize_feature(tBodyAccJerk_mean_Y, "tBodyAccJerk-mean()-Y"),
+                "tBodyAccJerk-mean()-Z": normalize_feature(tBodyAccJerk_mean_Z, "tBodyAccJerk-mean()-Z"),
+                "tBodyAccJerk-max()-X": normalize_feature(tBodyAccJerk_max_X, "tBodyAccJerk-max()-X"),
+                "tBodyAccJerk-max()-Y": normalize_feature(tBodyAccJerk_max_Y, "tBodyAccJerk-max()-Y"),
+                "tBodyAccJerk-max()-Z": normalize_feature(tBodyAccJerk_max_Z, "tBodyAccJerk-max()-Z"),
+                "tBodyAccJerk-min()-X": normalize_feature(tBodyAccJerk_min_X, "tBodyAccJerk-min()-X"),
+                "tBodyAccJerk-min()-Y": normalize_feature(tBodyAccJerk_min_Y, "tBodyAccJerk-min()-Y"),
+                "tBodyAccJerk-min()-Z": normalize_feature(tBodyAccJerk_min_Z, "tBodyAccJerk-min()-Z"),
+                "tBodyGyro-mean()-X": normalize_feature(tBodyGyro_mean_X, "tBodyGyro-mean()-X"),
+                "tBodyGyro-mean()-Y": normalize_feature(tBodyGyro_mean_Y, "tBodyGyro-mean()-Y"),
+                "tBodyGyro-mean()-Z": normalize_feature(tBodyGyro_mean_Z, "tBodyGyro-mean()-Z"),
+                "tBodyGyro-max()-X": normalize_feature(tBodyGyro_max_X, "tBodyGyro-max()-X"),
+                "tBodyGyro-max()-Y": normalize_feature(tBodyGyro_max_Y, "tBodyGyro-max()-Y"),
+                "tBodyGyro-max()-Z": normalize_feature(tBodyGyro_max_Z, "tBodyGyro-max()-Z"),
+                "tBodyGyro-min()-X": normalize_feature(tBodyGyro_min_X, "tBodyGyro-min()-X"),
+                "tBodyGyro-min()-Y": normalize_feature(tBodyGyro_min_Y, "tBodyGyro-min()-Y"),
+                "tBodyGyro-min()-Z": normalize_feature(tBodyGyro_min_Z, "tBodyGyro-min()-Z"),
+                "tBodyGyroJerk-mean()-X": normalize_feature(tBodyGyroJerk_mean_X, "tBodyGyroJerk-mean()-X"),
+                "tBodyGyroJerk-mean()-Y": normalize_feature(tBodyGyroJerk_mean_Y, "tBodyGyroJerk-mean()-Y"),
+                "tBodyGyroJerk-mean()-Z": normalize_feature(tBodyGyroJerk_mean_Z, "tBodyGyroJerk-mean()-Z"),
+                "tBodyGyroJerk-max()-X": normalize_feature(tBodyGyroJerk_max_X, "tBodyGyroJerk-max()-X"),
+                "tBodyGyroJerk-max()-Y": normalize_feature(tBodyGyroJerk_max_Y, "tBodyGyroJerk-max()-Y"),
+                "tBodyGyroJerk-max()-Z": normalize_feature(tBodyGyroJerk_max_Z, "tBodyGyroJerk-max()-Z"),
+                "tBodyGyroJerk-min()-X": normalize_feature(tBodyGyroJerk_min_X, "tBodyGyroJerk-min()-X"),
+                "tBodyGyroJerk-min()-Y": normalize_feature(tBodyGyroJerk_min_Y, "tBodyGyroJerk-min()-Y"),
+                "tBodyGyroJerk-min()-Z": normalize_feature(tBodyGyroJerk_min_Z, "tBodyGyroJerk-min()-Z"),
+                "tBodyAccMag-mean()": normalize_feature(tBodyAccMag_mean, "tBodyAccMag-mean()"),
+                "tBodyAccMag-max()": normalize_feature(tBodyAccMag_max, "tBodyAccMag-max()"),
+                "tBodyAccMag-min()": normalize_feature(tBodyAccMag_min, "tBodyAccMag-min()"),
+                "tBodyAccJerkMag-mean()": normalize_feature(tBodyAccJerkMag_mean, "tBodyAccJerkMag-mean()"),
+                "tBodyAccJerkMag-max()": normalize_feature(tBodyAccJerkMag_max, "tBodyAccJerkMag-max()"),
+                "tBodyAccJerkMag-min()": normalize_feature(tBodyAccJerkMag_min, "tBodyAccJerkMag-min()"),
+                "tBodyGyroMag-mean()": normalize_feature(tBodyGyroMag_mean, "tBodyGyroMag-mean()"),
+                "tBodyGyroMag-max()": normalize_feature(tBodyGyroMag_max, "tBodyGyroMag-max()"),
+                "tBodyGyroMag-min()": normalize_feature(tBodyGyroMag_min, "tBodyGyroMag-min()"),
+                "tBodyGyroJerkMag-mean()": normalize_feature(tBodyGyroJerkMag_mean, "tBodyGyroJerkMag-mean()"),
+                "tBodyGyroJerkMag-max()": normalize_feature(tBodyGyroJerkMag_max, "tBodyGyroJerkMag-max()"),
+                "tBodyGyroJerkMag-min()": normalize_feature(tBodyGyroJerkMag_min, "tBodyGyroJerkMag-min()"),
+                "fBodyAcc-mean()-X": normalize_feature(fBodyAcc_mean_X, "fBodyAcc-mean()-X"),
+                "fBodyAcc-mean()-Y": normalize_feature(fBodyAcc_mean_Y, "fBodyAcc-mean()-Y"),
+                "fBodyAcc-mean()-Z": normalize_feature(fBodyAcc_mean_Z, "fBodyAcc-mean()-Z"),
+                "fBodyAcc-max()-X": normalize_feature(fBodyAcc_max_X, "fBodyAcc-max()-X"),
+                "fBodyAcc-max()-Y": normalize_feature(fBodyAcc_max_Y, "fBodyAcc-max()-Y"),
+                "fBodyAcc-max()-Z": normalize_feature(fBodyAcc_max_Z, "fBodyAcc-max()-Z"),
+                "fBodyAcc-min()-X": normalize_feature(fBodyAcc_min_X, "fBodyAcc-min()-X"),
+                "fBodyAcc-min()-Y": normalize_feature(fBodyAcc_min_Y, "fBodyAcc-min()-Y"),
+                "fBodyAcc-min()-Z": normalize_feature(fBodyAcc_min_Z, "fBodyAcc-min()-Z"),
+                "fBodyAccJerk-mean()-X": normalize_feature(fBodyAccJerk_mean_X, "fBodyAccJerk-mean()-X"),
+                "fBodyAccJerk-mean()-Y": normalize_feature(fBodyAccJerk_mean_Y, "fBodyAccJerk-mean()-Y"),
+                "fBodyAccJerk-mean()-Z": normalize_feature(fBodyAccJerk_mean_Z, "fBodyAccJerk-mean()-Z"),
+                "fBodyAccJerk-max()-X": normalize_feature(fBodyAccJerk_max_X, "fBodyAccJerk-max()-X"),
+                "fBodyAccJerk-max()-Y": normalize_feature(fBodyAccJerk_max_Y, "fBodyAccJerk-max()-Y"),
+                "fBodyAccJerk-max()-Z": normalize_feature(fBodyAccJerk_max_Z, "fBodyAccJerk-max()-Z"),
+                "fBodyAccJerk-min()-X": normalize_feature(fBodyAccJerk_min_X, "fBodyAccJerk-min()-X"),
+                "fBodyAccJerk-min()-Y": normalize_feature(fBodyAccJerk_min_Y, "fBodyAccJerk-min()-Y"),
+                "fBodyAccJerk-min()-Z": normalize_feature(fBodyAccJerk_min_Z, "fBodyAccJerk-min()-Z"),
+                "fBodyGyro-mean()-X": normalize_feature(fBodyGyro_mean_X, "fBodyGyro-mean()-X"),
+                "fBodyGyro-mean()-Y": normalize_feature(fBodyGyro_mean_Y, "fBodyGyro-mean()-Y"),
+                "fBodyGyro-mean()-Z": normalize_feature(fBodyGyro_mean_Z, "fBodyGyro-mean()-Z"),
+                "fBodyGyro-max()-X": normalize_feature(fBodyGyro_max_X, "fBodyGyro-max()-X"),
+                "fBodyGyro-max()-Y": normalize_feature(fBodyGyro_max_Y, "fBodyGyro-max()-Y"),
+                "fBodyGyro-max()-Z": normalize_feature(fBodyGyro_max_Z, "fBodyGyro-max()-Z"),
+                "fBodyGyro-min()-X": normalize_feature(fBodyGyro_min_X, "fBodyGyro-min()-X"),
+                "fBodyGyro-min()-Y": normalize_feature(fBodyGyro_min_Y, "fBodyGyro-min()-Y"),
+                "fBodyGyro-min()-Z": normalize_feature(fBodyGyro_min_Z, "fBodyGyro-min()-Z"),
+                "fBodyAccMag-mean()": normalize_feature(fBodyAccMag_mean, "fBodyAccMag-mean()"),
+                "fBodyAccMag-max()": normalize_feature(fBodyAccMag_max, "fBodyAccMag-max()"),
+                "fBodyAccMag-min()": normalize_feature(fBodyAccMag_min, "fBodyAccMag-min()"),
+                "fBodyBodyAccJerkMag-mean()": normalize_feature(fBodyAccJerkMag_mean, "fBodyBodyAccJerkMag-mean()"),
+                "fBodyBodyAccJerkMag-max()": normalize_feature(fBodyAccJerkMag_max, "fBodyBodyAccJerkMag-max()"),
+                "fBodyBodyAccJerkMag-min()": normalize_feature(fBodyAccJerkMag_min, "fBodyBodyAccJerkMag-min()"),
+                "fBodyBodyGyroMag-mean()": normalize_feature(fBodyGyroMag_mean, "fBodyBodyGyroMag-mean()"),
+                "fBodyBodyGyroMag-max()": normalize_feature(fBodyGyroMag_max, "fBodyBodyGyroMag-max()"),
+                "fBodyBodyGyroMag-min()": normalize_feature(fBodyGyroMag_min, "fBodyBodyGyroMag-min()"),
+                "fBodyBodyGyroJerkMag-mean()": normalize_feature(fBodyGyroJerkMag_mean, "fBodyBodyGyroJerkMag-mean()"),
+                "fBodyBodyGyroJerkMag-max()": normalize_feature(fBodyGyroJerkMag_max, "fBodyBodyGyroJerkMag-max()"),
+                "fBodyBodyGyroJerkMag-min()": normalize_feature(fBodyGyroJerkMag_min, "fBodyBodyGyroJerkMag-min()")
             }
+
+            print(azure_data)
+            
+            # Send data to Azure IoT Hub asynchronously
+            asyncio.create_task(send_to_azure_iot_hub(azure_data))
         
             # Log individual samples to file
             # for sample_id, (ax, ay, az, gx, gy, gz) in enumerate(window):
@@ -526,6 +559,20 @@ def handle_notification(_, data: bytearray):
         logger.error(f"Decode error: {e}")
 
 async def main():
+    global iot_hub_client
+    
+    # Initialize Azure IoT Hub client if connection string is provided
+    if AZURE_IOT_CONNECTION_STRING:
+        try:
+            iot_hub_client = IoTHubDeviceClient.create_from_connection_string(AZURE_IOT_CONNECTION_STRING)
+            await iot_hub_client.connect()
+            logger.info("Connected to Azure IoT Hub")
+        except Exception as e:
+            logger.error(f"Failed to connect to Azure IoT Hub: {e}")
+            logger.warning("Continuing without Azure IoT Hub connection")
+    else:
+        logger.warning("AZURE_IOT_CONNECTION_STRING not set, Azure IoT Hub integration disabled")
+    
     logger.info("Scanning for BLE devices...")
     devices = await BleakScanner.discover(timeout=5.0)
 
@@ -552,7 +599,14 @@ async def main():
         except KeyboardInterrupt:
             logger.info("Disconnecting...")
         finally:
-            await client.stop_notify(CHAR_UUID)
+            await client.stop_notify(CHAR_UUID)            
+            # Disconnect from Azure IoT Hub
+            if iot_hub_client:
+                try:
+                    await iot_hub_client.disconnect()
+                    logger.info("Disconnected from Azure IoT Hub")
+                except Exception as e:
+                    logger.error(f"Error disconnecting from Azure IoT Hub: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
