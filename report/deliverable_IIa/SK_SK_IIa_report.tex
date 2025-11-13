@@ -367,7 +367,7 @@
 	
 	After creating the ASA job, it needs to be given an input to take in IoT device data, an output to send the data on to Power BI for visualisation, a function to query the REST API, and an SQL query to transfer the information from input to output while also including the function output. 
 	
-	First, create an input, ensure that IoT Hub is chosen as the input type, and give it a unique name. The creation window will look like Figure~\ref{fig:creating_input}. Give it a unique name and choose the IoT Hub that your IoT device is sending to.
+	First, create an input, ensure that IoT Hub is chosen as the input type, and give it a unique name. The creation window will look like Figure~\ref{fig:creating_input}. Give it a unique name and choose the IoT Hub that the IoT device is sending to.
 	
 	\begin{figure}[t]
 		\centering
@@ -385,9 +385,9 @@
 		\label{fig:function_creation}
 	\end{figure}
 	
-	Before completing the next task, create a workspace in Power BI, or take note of a workspace you have been using. Take note of the workspace name. Figure~\ref{fig:power_bi_workspace_creation} shows what the creation window looks like in Power BI.
+	Before completing the next task, create a workspace in Power BI, or take note of a workspace that is in use. Take note of the workspace name. Figure~\ref{fig:power_bi_workspace_creation} shows what the creation window looks like in Power BI.
 	
-	Creating the workspace is necessary because Azure Stream Analytics writes its output directly into a Power BI dataset. The workspace you select determines where the real time dataset will appear and where the final visualisations will be built.
+	Creating the workspace is necessary because Azure Stream Analytics writes its output directly into a Power BI dataset. The workspace selected determines where the real time dataset will appear and where the final visualisations will be built.
 	\begin{figure}[t]
 		\centering
 		\includegraphics[width=0.2\linewidth]{figures/creating_workspace_power_bi.png}
@@ -395,7 +395,7 @@
 		\label{fig:power_bi_workspace_creation}
 	\end{figure}
 	
-	Next, back in the Stream Analytics Job, create an output. Choose Power BI when adding the output. Give a unique name, and choose the workspace from your Power BI account. Give a name to the dataset and the table. You will also need to Authorise the connection to your Power BI. The creation window is shown in Figure~\ref{fig:adding_output}.
+	Next, back in the Stream Analytics Job, create an output. Choose Power BI when adding the output. Give a unique name, and choose the workspace from the Power BI account. Give a name to the dataset and the table. There will also be a need to Authorise the connection to Power BI. The creation window is shown in Figure~\ref{fig:adding_output}.
 	
 	The Power BI output defines the destination for the model predictions produced by the Azure ML function. Once the connection is authorised, Stream Analytics will push each prediction into the specified dataset and table in real time, allowing Power BI to automatically update dashboards and reports as new IoT messages arrive.
 	
@@ -408,7 +408,9 @@
 	
 	Finally, create an SQL query. This is done last as the names of the inputs, outputs, and functions must be known in order to create the query.
 	
-	The SQL query acts as the transformation and routing layer between the  IoT telemetry, the Azure ML endpoint, and the final output consumed by Power BI. It must reshape the raw device messages into the JSON structure expected by the REST API, call the machine learning function using that payload, and then format the prediction results into a table that can be visualised in Power BI. The full query used in this project is shown in Appendix~\ref{azure_sql}, where each clause ensures the correct mapping of fields from the IoT device to the model input and the extraction of the returned prediction. To note here, Power BI only supports a maximum of 75 columns when it is receiving the data, so the data sent to Power BI only includes a subset of features, and the prediction label.
+	The SQL query acts as the transformation and routing layer between the  IoT telemetry, the Azure ML endpoint, and the final output consumed by Power BI. It must reshape the raw device messages into the JSON structure expected by the REST API, call the machine learning function using that payload, and then format the prediction results into a table that can be visualised in Power BI. The full query used in this project is shown in Appendix~\ref{azure_sql}, where each clause ensures the correct mapping of fields from the IoT device to the model input and the extraction of the returned prediction.
+	
+	To note here, Power BI only supports a maximum of 75 columns when it is receiving the data, so the data sent to Power BI only includes a subset of features, and the prediction label. Also note that it is important to send the timestamps for the data, to allow for visualising in Power BI.
 	
 	The ASA Job is now ready to be started. After starting the job, the overview page will look like Figure~\ref{fig:asa_job}
 	
@@ -420,6 +422,44 @@
 	\end{figure}
 	
 	\subsection{Visualising in Power BI}
+	Once the IoT device has started transmitting, and the previous steps have been completed, the dataset specified will start receiving data in Power BI. 
+	
+	First, go to the workspace that the data is being sent to, there will now be a new dataset, with the same name as what was specified previously. Figure~\ref{fig:power_bi_dataset} shows what the workspace might look like now in Power BI. 
+	
+	\begin{figure}[t]
+	\centering
+	\includegraphics[width=\linewidth]{figures/workspace_with_dataset.png}
+	\caption{Power BI Workspace showing the new dataset from the ASA Job.}
+	\label{fig:power_bi_dataset}
+	\end{figure}	
+	
+	Next, create a report on the dataset. 
+	
+	With the editing view, the data pane is the right, the data should be visible in the format specified in the SQL query created as part of the ASA job creation step, this can be seen in Figure~\ref{fig:bare_report} 
+	
+	\begin{figure}[t]
+	\centering
+	\includegraphics[width=\linewidth]{figures/report_creation_page.png}
+	\caption{Power BI Report Creation Workspace with data on the right.}
+	\label{fig:bare_report}
+	\end{figure}		
+	 
+	Now, various visuals for the data are available in the \texttt{Visualizations} tab. For this project, two \texttt{Line Chart}s and a \texttt{Card} are chosen. These can be dragged into the workspace. 
+	
+	For the \texttt{Line Chart}s, in the case of the data for this project, the \texttt{EventEnqueuedUtcTime} time was chosen for the X-axis for both charts. Then each chart displayed the X, Y and Z axes for Gyroscopic and Accelerometer Data respectively. To make the dashboard display the newest information, a filter was applied to both of these dashboard to only display data from the past minute. This was done by applying a filter, in the \texttt{Filters} tab, on \texttt{EventEnqueuedUtcTime} for both charts.
+	
+	The \texttt{Card} was then used to display the last \texttt{activity\_label}, therefore displaying the current activity.
+	
+	The final visualisation can be seen in Figure~\ref{fig:power_bi_visualisation}.
+	
+	
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/power_bi_final_visual.png}
+		\caption{Final Power BI Visualisation}
+		\label{fig:power_bi_visualisation}
+	\end{figure}
 	
 	\bibliographystyle{IEEEtran}
 	\bibliography{references}
@@ -473,8 +513,9 @@
 	
 	\section{Azure Stream Analytics job Query}\label{azure_sql}
 	\begin{lstlisting}[language=SQL]
-		WITH Features AS (
+		WITH FeaturesWithTime AS (
 			SELECT
+				EventEnqueuedUtcTime,
 				activity,
 				[tBodyAcc-mean()-X],
 				[tBodyAcc-mean()-Y],
@@ -565,15 +606,126 @@
 				[fBodyBodyGyroJerkMag-min()]
 			FROM
 				[activity-recognition-hub]
+		),
+		
+		Features AS (
+			SELECT
+				activity,
+				[tBodyAcc-mean()-X],
+				[tBodyAcc-mean()-Y],
+				[tBodyAcc-mean()-Z],
+				[tBodyAcc-max()-X],
+				[tBodyAcc-max()-Y],
+				[tBodyAcc-max()-Z],
+				[tBodyAcc-min()-X],
+				[tBodyAcc-min()-Y],
+				[tBodyAcc-min()-Z],
+				[tBodyAccJerk-mean()-X],
+				[tBodyAccJerk-mean()-Y],
+				[tBodyAccJerk-mean()-Z],
+				[tBodyAccJerk-max()-X],
+				[tBodyAccJerk-max()-Y],
+				[tBodyAccJerk-max()-Z],
+				[tBodyAccJerk-min()-X],
+				[tBodyAccJerk-min()-Y],
+				[tBodyAccJerk-min()-Z],
+				[tBodyGyro-mean()-X],
+				[tBodyGyro-mean()-Y],
+				[tBodyGyro-mean()-Z],
+				[tBodyGyro-max()-X],
+				[tBodyGyro-max()-Y],
+				[tBodyGyro-max()-Z],
+				[tBodyGyro-min()-X],
+				[tBodyGyro-min()-Y],
+				[tBodyGyro-min()-Z],
+				[tBodyGyroJerk-mean()-X],
+				[tBodyGyroJerk-mean()-Y],
+				[tBodyGyroJerk-mean()-Z],
+				[tBodyGyroJerk-max()-X],
+				[tBodyGyroJerk-max()-Y],
+				[tBodyGyroJerk-max()-Z],
+				[tBodyGyroJerk-min()-X],
+				[tBodyGyroJerk-min()-Y],
+				[tBodyGyroJerk-min()-Z],
+				[tBodyAccMag-mean()],
+				[tBodyAccMag-max()],
+				[tBodyAccMag-min()],
+				[tBodyAccJerkMag-mean()],
+				[tBodyAccJerkMag-max()],
+				[tBodyAccJerkMag-min()],
+				[tBodyGyroMag-mean()],
+				[tBodyGyroMag-max()],
+				[tBodyGyroMag-min()],
+				[tBodyGyroJerkMag-mean()],
+				[tBodyGyroJerkMag-max()],
+				[tBodyGyroJerkMag-min()],
+				[fBodyAcc-mean()-X],
+				[fBodyAcc-mean()-Y],
+				[fBodyAcc-mean()-Z],
+				[fBodyAcc-max()-X],
+				[fBodyAcc-max()-Y],
+				[fBodyAcc-max()-Z],
+				[fBodyAcc-min()-X],
+				[fBodyAcc-min()-Y],
+				[fBodyAcc-min()-Z],
+				[fBodyAccJerk-mean()-X],
+				[fBodyAccJerk-mean()-Y],
+				[fBodyAccJerk-mean()-Z],
+				[fBodyAccJerk-max()-X],
+				[fBodyAccJerk-max()-Y],
+				[fBodyAccJerk-max()-Z],
+				[fBodyAccJerk-min()-X],
+				[fBodyAccJerk-min()-Y],
+				[fBodyAccJerk-min()-Z],
+				[fBodyGyro-mean()-X],
+				[fBodyGyro-mean()-Y],
+				[fBodyGyro-mean()-Z],
+				[fBodyGyro-max()-X],
+				[fBodyGyro-max()-Y],
+				[fBodyGyro-max()-Z],
+				[fBodyGyro-min()-X],
+				[fBodyGyro-min()-Y],
+				[fBodyGyro-min()-Z],
+				[fBodyAccMag-mean()],
+				[fBodyAccMag-max()],
+				[fBodyAccMag-min()],
+				[fBodyBodyAccJerkMag-mean()],
+				[fBodyBodyAccJerkMag-max()],
+				[fBodyBodyAccJerkMag-min()],
+				[fBodyBodyGyroMag-mean()],
+				[fBodyBodyGyroMag-max()],
+				[fBodyBodyGyroMag-min()],
+				[fBodyBodyGyroJerkMag-mean()],
+				[fBodyBodyGyroJerkMag-max()],
+				[fBodyBodyGyroJerkMag-min()]
+			FROM
+				FeaturesWithTime
 		)
 		
 		SELECT
-			Features.*,
-			--[do-recognise-activity](Features) AS result
-			([do-recognise-activity](Features)).[Scored Labels] AS result
-		INTO
-			[My-Workspace]
-		FROM Features;
+			FWT.EventEnqueuedUtcTime,
+			FWT.[tBodyAcc-mean()-X],
+			FWT.[tBodyAcc-mean()-Y],
+			FWT.[tBodyAcc-mean()-Z],
+			FWT.[tBodyAccJerk-mean()-X],
+			FWT.[tBodyGyro-mean()-X],
+			FWT.[tBodyGyro-mean()-Y],
+			FWT.[tBodyGyro-mean()-Z],
+			FWT.[tBodyAccMag-mean()],
+			FWT.[tBodyAccMag-max()],
+			FWT.[tBodyGyroMag-mean()],
+			FWT.[fBodyAcc-mean()-X],
+			FWT.[fBodyAcc-mean()-Y],
+			FWT.[fBodyAcc-mean()-Z],
+			FWT.[fBodyAccJerk-mean()-X],
+			FWT.[fBodyGyro-mean()-X],
+			FWT.[fBodyBodyGyroMag-mean()],
+			FWT.[fBodyAccMag-mean()],
+			FWT.[fBodyBodyGyroJerkMag-mean()],
+			([do-recognise-activity](F)).[Scored Labels] AS result
+		INTO [My-Workspace]
+			FROM FeaturesWithTime FWT
+		JOIN Features F ON DATEDIFF(second, FWT, F) BETWEEN 0 AND 1;
 	\end{lstlisting}
 
 
