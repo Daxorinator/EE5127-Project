@@ -56,34 +56,32 @@
 	
 	\section{Introduction}
 	
-	Human Activity Recognition (HAR) is an important area in the domain of machine learning and medical computing. The focus is the identification and classification of human physical activities based on provided sensor data. The data can be collecte by a wide range of devices, from stationary room sensing video or radar that can monitor multiple subjects, to wearable or mobile devices that can monitor individual subjects. HAR has become an important component in applications such as remote patient monitoring and assisted living.  
+	Human Activity Recognition (HAR) is an important area in the domain of machine learning and medical computing. Focusing on identification and classification of human physical activities based on sensor data. Data for HAR is collected by a wide range of devices, from stationary room sensing video or radar, to wearable or mobile devices. HAR has applications in fields such as remote patient monitoring and assisted living.  
 	
-	There are a number of large, labelled datasets available for human activity recognition. For this project, the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har} was chosen. This dataset contains sensor data collected from smartphone accelerometers and gyroscopes as participants performed activities such walking, sitting, and standing. The observations are represented by multiple time and frequency features extracted from the motion signals. Sensor signals from the device’s accelerometer and gyroscope were recorded at 50~Hz and processed into 561 time and frequency features.
+	There are a number of large, labelled datasets available for human activity recognition. For this project, the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har} is used. This dataset contains sensor data collected from smartphone accelerometers and gyroscopes, as participants performed activities such walking, sitting, and standing. The observations are represented by multiple time and frequency features extracted from the motion signals. Sensor signals from the device’s accelerometer and gyroscope were recorded and processed into 561 time and frequency features.
 	
-	This dataset was chosen over other datasets, such as HARTH dataset \cite{logacjov2021harth} \cite{bach2021classifier} for its simplicity, requiring only 1 worn sensor. And for the simpler set of classifications, which correspond better with scenarios that would arise in a care facility or other healthcare setting.
+	This dataset is chosen over other datasets, such as HARTH dataset \cite{logacjov2021harth} \cite{bach2021classifier} for its simplicity, requiring only 1 worn sensor. And for the simpler set of classifications, which correspond better with scenarios that would arise in a care facility or other healthcare setting.
 	
-	This paper aims to analyse and classify human activities using the UCI HAR dataset by developing and evaluating multiple machine learning models in Azure Machine Learning Studio. Power BI is employed to visualize data characteristics, feature distributions, and model performance metrics. The results provide insights into the role of sensor based data and machine learning in Human Activity Recognition.
-
-	The introductory paper \cite{anguita2013public} demonstrated that a multiclass Support Vector Machine (SVM) model could achieve an overall classification accuracy of 96\% on this dataset, comparable to or exceeding the performance of systems using specialised wearable sensors. Their work highlighted the feasibility of using simpler accelerometer and gyroscope sensors, such as smart phones, as unobtrusive, affordable, and reliable sensing tools for HAR.
+	This paper aims to analyse and classify human activities using the UCI HAR dataset by developing and evaluating multiple machine learning models in Azure Machine Learning Studio. Power BI is employed to visualise data characteristics, feature distributions, and model performance metrics. The results provide insights into the use of sensor based data and machine learning in Human Activity Recognition.
 	
 	\section{Dataset Description}
 	
 	\subsection{Dataset Source}
 	
-	The dataset used in this study is the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har}, first introduced in 2013. It was created as part of a study on human centered computing at the University of Genova and the Universitat Politècnica de Catalunya \cite{anguita2013public}. The dataset consists of sensor data collected from 30 volunteers aged between 19 and 48 years, performing six basic activities of daily living.
+	The dataset used in this study is the \textit{Human Activity Recognition Using Smartphones} dataset \cite{reyes2013har}, first introduced in 2013. Created as part of a study on human centered computing \cite{anguita2013public}, the dataset consists of sensor data collected from 30 volunteers aged between 19 and 48 years, performing six basic activities of daily living.
 	
-	Each participant carried a Samsung Galaxy S~II smartphone on the waist while performing the activities. The smartphone's embedded triaxial accelerometer and gyroscope were used to capture linear acceleration and angular velocity at a constant sampling rate of 50~Hz. The experiment was carried out in a controlled laboratory environment, with participants following a standardised sequence of activities to ensure consistency across samples. The signals were normalised and bounded within 
+	Each participant carried a Samsung Galaxy S~II smartphone on the waist. The smartphone's embedded accelerometer and gyroscope were used to capture linear acceleration and angular velocity at a constant sampling rate of 50~Hz. The experiment was carried out in a controlled laboratory environment, with participants following a standardised sequence of activities to ensure consistency across samples. The signals were normalised and bounded within 
 	[1, -1], and each feature vector is also standardised. 
 	
-	The dataset is publicly available from the UCI Machine Learning Repository under an open license. 
+	The introductory paper \cite{anguita2013public} demonstrated that a multiclass Support Vector Machine (SVM) model could achieve an overall classification accuracy of 96\% on this dataset, comparable to or exceeding the performance of systems using specialised wearable sensors. Their work highlighted the feasibility of using simpler accelerometer and gyroscope sensors, such as smart phones, as unobtrusive, affordable, and reliable sensing tools for HAR.
 
 	\subsection{Feature Overview}
 	
 	The dataset provides both raw sensor readings and pre-processed feature vectors based on that raw data. Each observation represents a 2.56~second window of sensor data with 50\% overlap between adjacent windows, there are 128 readings per window. From each window, 561 features were extracted from the time and frequency domains.
 	
-	The features include statistical and signal based measures such as mean, standard deviation, median absolute deviation, signal magnitude area, and correlation between sensor axes. Frequency domain features were obtained using Fast Fourier Transform (FFT) on the windowed signals. These features capture important motion characteristics for each activity and are normalised to ensure comparability across subjects and sessions.
+	The features include statistical and signal based measures such as mean, standard deviation, median absolute deviation, signal magnitude area, and correlation between sensor axes. Frequency domain features were obtained using Fast Fourier Transform (FFT) on the windowed signals, used to capture additional important motion characteristics for each activity.
 
-	Additionally, subject identifiers (1–30) are included, allowing for subject specific or subject independent analysis.
+	Additionally, subject identifiers (1–30) are included, allowing for subject specific analysis.
 	
 	In the dataset, each of the recorded activities is encoded numerically as follows: 
 	1–\textit{Walking}, 2–\textit{Walking Upstairs}, 3–\textit{Walking Downstairs}, 
@@ -92,11 +90,10 @@
 
 	\subsection{Data Preparation}\label{data_preparation}
 	
-	Prior to model training, a subset of the original dataset features was selected to simplify the analysis and reduce computational overhead. The full UCI HAR dataset contains 561 features derived from both time and frequency transformations. This feature set provides detailed motion characterisation, but it is computationally expensive to process, particularly on the edge in the Rasbperry Pi. 
+	Prior to analysis, experimentation and model training, a subset of the original dataset features was selected to simplify the analysis and reduce computational overhead. The full UCI HAR dataset contains 561 features derived from both time and frequency transformations. This feature set provides detailed motion characterisation, but it is computationally expensive to process, particularly on the edge in the Rasbperry Pi. 
 	
-	To address this, a representative subset of features was selected, focusing on descriptive statistics (mean, maximum, and minimum values) from the accelerometer and gyroscope signals in both body and gravity components.
+	To address this, a representative subset of features was selected, focusing on descriptive statistics (mean, maximum, and minimum values) from the accelerometer and gyroscope signals.
 	
-
 	The retained features include the following categories:
 	\begin{itemize}
 		\item \textbf{Time domain features:} body acceleration, body acceleration jerk, gyroscope, and gyroscope jerk (mean, max, and min for each axis)
@@ -106,16 +103,16 @@
 	
 	This reduced dataset comprises 101 variables in total. This reduction improves computational efficiency on the edge where limited processing power and energy consumption are key considerations.
 	
-	The original study \cite{anguita2013public} employed a Support Vector Machine (SVM) classifier, which required extensive pre-processed features to achieve high accuracy.  This work explores more modern machine learning techniques capable of capturing non-linear relationships and implicit feature interactions. It is therefore expected that the reliance on an extensive set of features is reduced without sacrificing accuracy.
+	The original study \cite{anguita2013public} employed an SVM classifier, which required extensive pre-processed features to achieve high accuracy.  This work explores modern machine learning techniques capable of capturing non-linear relationships and feature interactions. It is therefore expected that the reliance on an extensive set of features is reduced without sacrificing accuracy.
 	
-	On the Azure Machine Learning side, the \texttt{subject} feature was excluded from model training to prevent the classifier from learning participant specific patterns.
+	On the Azure Machine Learning side, the \texttt{subject} feature was excluded from model training to generalise the data.
 
 	
 	\section{Data Analysis}
 	
 	\subsection{Data Characteristics}
 	
-	The class distribution, illustrated in Fig.~\ref{fig:activity-count}, shows that the dataset is generally well balanced across the six activity categories. Each activity contains roughly a similar number of samples, ensuring that the classification problem is not significantly biased toward any single class. 
+	The class distribution, illustrated in Fig.~\ref{fig:activity-count}, shows that the dataset is well balanced across the six activity categories. Each activity contains roughly a similar number of samples, ensuring that the classification problem is not biased toward any single class. 
 	
 	\begin{figure}[t]
 		\centering
@@ -134,25 +131,25 @@
 		\label{fig:gyro-acc-scatter}
 	\end{figure}
 	
-	Figure~\ref{fig:feature-histograms} shows the distributions of several representative accelerometer and gyroscope mean features. 
-	The features are bounded within $[-1, 1]$, confirming that normalisation was applied to the dataset to remove sensor bias and ensure comparable scaling across variables. 
+	Figure~\ref{fig:feature-histograms} shows the distributions of several accelerometer and gyroscope mean features. 
+	The features are bounded within $[-1, 1]$, confirming that normalisation was applied to the dataset to remove sensor bias and ensure comparable scaling. 
 	The histograms verify that the dataset is in a state suitable for machine learning analysis.
 	
-	The frequency domain gyroscope features (\texttt{fBodyGyro-mean()-X} and \texttt{fBodyGyro-mean()-Z}) in the top left of Fig.~\ref{fig:feature-histograms} display a wedge shaped distribution, in contrast to the more symmetric time domain features. Reflecting the characteristics of magnitudes produced by the Fast Fourier Transform, low frequency components appear more consistently, and high frequency components occur less frequently but with greater variability. 
+	The frequency domain gyroscope features (\texttt{fBodyGyro-mean()-X} and \texttt{fBodyGyro-mean()-Z}) in the top left of Fig.~\ref{fig:feature-histograms} display an unusual wedge shaped distribution, in contrast to the more symmetric time domain features. This reflects the characteristics of FFT outputs, low frequency components appear more consistently, and high frequency components occur less frequently but with greater variability. 
 
-	The data shows a complementary relationship between time and frequency domain, with time features capturing instantaneous motion and orientation, frequency features show periodicity and energy characteristics. Including both will give the model better information about the motion patterns.
+	The data shows that there is a complementary relationship between time and frequency domain, with time features capturing instantaneous motion and orientation, frequency features show periodicity and energy characteristics. Including both will give the model better information about the motion patterns.
 	
 	\begin{figure}[t]
 		\centering
 		\includegraphics[trim=10 95 10 50,clip,width=\linewidth]{figures/histograms.pdf}
-		\caption{Histograms of representative accelerometer and gyroscope mean features, showing that all sensor readings are centered near zero and lie within the normalized range of $[-1, 1]$.}
+		\caption{Histograms of representative accelerometer and gyroscope mean features.}
 		\label{fig:feature-histograms}
 	\end{figure}
 
 	\subsection{Trends and Patterns}
 	
 	Figure~\ref{fig:feature-heatmap} illustrates the mean body acceleration and gyroscope signals across all activities.
-	The mean acceleration values are relatively uniform across classes, reflecting the normalisation of sensor data and the short, steady recording intervals.
+	The mean acceleration values are relatively uniform across classes.
 	Subtle variations are visible in the gyroscope means, particularly along the Z-axis, corresponding to torso rotation and orientation differences during activities such as walking or laying.
 	These differences are expected given that the device was worn at the waist, where small postural changes and rotational motion are captured more strongly in the gyroscope signals.
 	Overall, the heatmap confirms that the dataset’s body motion features capture the small variations between activity types.
@@ -160,7 +157,7 @@
 	\begin{figure}[t]
 		\centering
 		\includegraphics[width=\linewidth]{figures/heatmap.png}
-		\caption{Heatmap of selected mean accelerometer and gyroscope features across activity classes. Dynamic activities show higher mean magnitudes than static postures.}
+		\caption{Heatmap of selected mean accelerometer and gyroscope features across activity classes.}
 		\label{fig:feature-heatmap}
 	\end{figure}
 
@@ -168,11 +165,11 @@
 	\subsection{Feature Comparison}
 	
 	Figure~\ref{fig:feature-grouped-bar} compares the mean magnitudes of selected motion features across all activity classes. 
-	These features, including the body acceleration magnitude (\texttt{tBodyAccMag-mean()}), gyroscope magnitude (\texttt{tBodyGyroMag-mean()}), and jerk-derived magnitudes, represent the overall intensity of body motion.
+	These features, including the body acceleration magnitude, gyroscope magnitude, and jerk magnitudes, represent the overall intensity of body motion.
 	
 	A separation is visible between dynamic and static activities. 
 	\textit{Walking}, \textit{Walking Upstairs}, and \textit{Walking Downstairs} (classes 1–3) exhibit notably higher magnitude values across all features, indicating stronger overall motion and rotational activity. 
-	Among these, \textit{Walking Downstairs} shows significantly higher jerk magnitudes, reflecting the more abrupt deceleration and impact forces during descent. 
+	Among these, \textit{Walking Downstairs} shows significantly higher jerk magnitudes, due to the more abrupt deceleration and impact forces during descent. 
 	
 	In contrast, static postures such as \textit{Sitting}, \textit{Standing}, and \textit{Laying} (classes 4–6) display consistently lower mean magnitudes across all sensors. 
 	The near zero variation among these static classes suggests limited body movement and stable device orientation. 
@@ -181,7 +178,7 @@
 	\begin{figure}[t]
 		\centering
 		\includegraphics[width=\linewidth]{figures/feature_grouped_bar.png}
-		\caption{Comparison of mean motion magnitude features across activities. Dynamic activities exhibit higher overall intensity than static postures.}
+		\caption{Comparison of mean motion magnitude features across activities.}
 		\label{fig:feature-grouped-bar}
 	\end{figure}
 
@@ -199,7 +196,7 @@
 	\begin{figure}[t]
 		\centering
 		\includegraphics[width=\linewidth]{figures/boxplot_tBodyAccMag.png}
-		\caption{Box plot of mean body acceleration magnitude (\texttt{tBodyAccMag-mean()}) across activity classes. Generated with Matplotlib as Box Plot methods on Power BI Online would not work.}
+		\caption{Box plot of mean body acceleration magnitude (\texttt{tBodyAccMag-mean()}) across activity classes. The plot was generated using Matplotlib, as Power BI Online does not currently support box plot creation.}
 		\label{fig:boxplot-accmag}
 	\end{figure}
 
@@ -208,7 +205,7 @@
 	
 	The data analysis highlights several meaningful trends across the dataset. 
 	First, the activity classes are well balanced, ensuring that subsequent classification experiments are not biased toward any single class. 
-	Normalisation has been applied to remove sensor bias and facilite comparison across variables. 
+	Normalisation has been applied to remove sensor bias and facilitate comparison across variables. 
 	
 	Feature comparisons show separations between static and dynamic activities across both time and frequency domains. 
 	Accelerometer features mostly capture translational body motion, making them effective for distinguishing movement, while gyroscope features show the rotation, which separates similar patterns such as \textit{Walking Upstairs} and \textit{Walking Downstairs}. 
@@ -221,7 +218,7 @@
 	
 	\section{Machine Learning Model Development and Evaluation}
 	
-	Machine learning models were developed and evaluated in Microsoft Azure ML Studio using the processed dataset described in Section \ref{data_preparation}. A multi-class classification problem was defined, where the target label corresponds to one of six human activity classes. All models were trained using an 70/30 train–test split, and performance was assessed through the use of the \texttt{Evaluate Model} component in ML Studio.
+	Machine learning models were developed and evaluated in Azure ML Studio using the processed dataset described in Section \ref{data_preparation}. A multi-class classification problem was defined, where the target label corresponds to one of six human activity classes. All models were trained using an 70/30 train/test split, and performance was assessed through the use of the \texttt{Evaluate Model} component in ML Studio.
 	
 	The experiments were conducted according to the project specification.
 	
@@ -288,7 +285,7 @@
 
 	
 	
-	\section{Results Comparison and Discussion}
+	\section{Experiment Results Comparison and Discussion}
 	
 	Table~\ref{tab:comparison-summary} summarises the performance of all experiments conducted in Azure ML Studio. The progression from single features to the full feature set demonstrates a clear relationship between feature richness, model complexity, and classification accuracy.
 	
@@ -323,7 +320,106 @@
 	
 	Overall, the experiments demonstrate that high classification accuracy in Human Activity Recognition depends primarily on the availability of informative features. Combining moderate feature selection with non-linear classifiers offers an optimal balance between computational efficiency and predictive accuracy, aligning with the design goals of scalable IoT systems.
 
+	\section{Documentation of Web Service Deployment, Use, and Visualisation}
+	
+	\subsection{Deploying a Machine Learning Model as a Web Service}
+	To deploy a machine learning model as a service, the first step is to create a real time inference pipeline from the pipeline that generated the model. Figure \ref{fig:pipeline-to-inference} shows the design of the original pipeline, and the resultant real time inference pipeline. Two components, \texttt{Web Service Input} and \texttt{Web Service Output}, have been added, to allow for querying an API and receiving a response.
+	
+	\begin{figure}[t]
+		\centering
+		
+		\begin{minipage}{0.48\linewidth}
+			\centering
+			\includegraphics[width=\linewidth]{figures/pipeline.png}
+			\textbf{(a) Pipeline}
+		\end{minipage}
+		\hfill
+		\begin{minipage}{0.48\linewidth}
+			\centering
+			\includegraphics[width=\linewidth]{figures/inference.png}
+			\textbf{(b) Inference Pipeline}
+		\end{minipage}
+		
+		\caption{Pipeline to inference workflow}
+		\label{fig:pipeline-to-inference}
+	\end{figure}
 
+	Once the Real Time Inference Pipeline has been created and completes its submission job, it will need to be deployed to a an endpoint, which will expose the model’s prediction logic through a REST API. The endpoint must be created first, and then the inference pipeline must be deployed to it. Once the endpoint is ready, it will be in the final "Healthy" state and inspecting the details page will give a similar output to that shown in Figure~\ref{fig:endpoint} 
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/real_time_inference_endpoint.png}
+		\caption{Details Page for Endpoint}
+		\label{fig:endpoint}
+	\end{figure}
+	
+	After the endpoint becomes healthy, the REST API can be queried directly. Azure also exposes an auto-generated Swagger specification for the endpoint, which documents the request and response formats that the service expects. This specification is useful for understanding the required JSON structure, supported operations, and example payloads. The start of the Swagger documentation for this deployment is shown in Figure~\ref{fig:swagger}.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/swagger_doc.png}
+		\caption{Swagger Output}
+		\label{fig:swagger}
+	\end{figure}
+	
+	\subsection{Creating and Running a Stream Analytics Job}
+	With the model now exposed through an endpoint, the next stage is to create a Azure Stream Analytics (ASA) job.
+	
+	After creating the ASA job, it needs to be given an input to take in IoT device data, an output to send the data on to Power BI for visualisation, a function to query the REST API, and an SQL query to transfer the information from input to output while also including the function output. 
+	
+	First, create an input, ensure that IoT Hub is chosen as the input type, and give it a unique name. The creation window will look like Figure~\ref{fig:creating_input}. Give it a unique name and choose the IoT Hub that your IoT device is sending to.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=0.2\linewidth]{figures/creating_input.png}
+		\caption{Creating an ASA input.}
+		\label{fig:creating_input}
+	\end{figure}
+	
+	Next, create a function. When adding the function, choose "Azure ML Service". The creation window will look like Figure~\ref{fig:function_creation}. Give it a unique name, and take note of the function signature, as this will be used to craft the SQL query.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=0.2\linewidth]{figures/function_creation.png}
+		\caption{Creating an ASA function.}
+		\label{fig:function_creation}
+	\end{figure}
+	
+	Before completing the next task, create a workspace in Power BI, or take note of a workspace you have been using. Take note of the workspace name. Figure~\ref{fig:power_bi_workspace_creation} shows what the creation window looks like in Power BI.
+	
+	Creating the workspace is necessary because Azure Stream Analytics writes its output directly into a Power BI dataset. The workspace you select determines where the real time dataset will appear and where the final visualisations will be built.
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=0.2\linewidth]{figures/creating_workspace_power_bi.png}
+		\caption{Power BI Workspace Creation.}
+		\label{fig:power_bi_workspace_creation}
+	\end{figure}
+	
+	Next, back in the Stream Analytics Job, create an output. Choose Power BI when adding the output. Give a unique name, and choose the workspace from your Power BI account. Give a name to the dataset and the table. You will also need to Authorise the connection to your Power BI. The creation window is shown in Figure~\ref{fig:adding_output}.
+	
+	The Power BI output defines the destination for the model predictions produced by the Azure ML function. Once the connection is authorised, Stream Analytics will push each prediction into the specified dataset and table in real time, allowing Power BI to automatically update dashboards and reports as new IoT messages arrive.
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=0.3\linewidth]{figures/creating_output.png}
+		\caption{Adding a Power BI output.}
+		\label{fig:adding_output}
+	\end{figure}
+	
+	Finally, create an SQL query. This is done last as the names of the inputs, outputs, and functions must be known in order to create the query.
+	
+	The SQL query acts as the transformation and routing layer between the  IoT telemetry, the Azure ML endpoint, and the final output consumed by Power BI. It must reshape the raw device messages into the JSON structure expected by the REST API, call the machine learning function using that payload, and then format the prediction results into a table that can be visualised in Power BI. The full query used in this project is shown in Appendix~\ref{azure_sql}, where each clause ensures the correct mapping of fields from the IoT device to the model input and the extraction of the returned prediction. To note here, Power BI only supports a maximum of 75 columns when it is receiving the data, so the data sent to Power BI only includes a subset of features, and the prediction label.
+	
+	The ASA Job is now ready to be started. After starting the job, the overview page will look like Figure~\ref{fig:asa_job}
+	
+	\begin{figure}[t]
+		\centering
+		\includegraphics[width=\linewidth]{figures/asa_overview_page.png}
+		\caption{Stream Analytics Job Overview Page when Job is running.}
+		\label{fig:asa_job}
+	\end{figure}
+	
+	\subsection{Visualising in Power BI}
 	
 	\bibliographystyle{IEEEtran}
 	\bibliography{references}
@@ -374,5 +470,111 @@
 	
 	
 	\end{lstlisting}
+	
+	\section{Azure Stream Analytics job Query}\label{azure_sql}
+	\begin{lstlisting}[language=SQL]
+		WITH Features AS (
+			SELECT
+				activity,
+				[tBodyAcc-mean()-X],
+				[tBodyAcc-mean()-Y],
+				[tBodyAcc-mean()-Z],
+				[tBodyAcc-max()-X],
+				[tBodyAcc-max()-Y],
+				[tBodyAcc-max()-Z],
+				[tBodyAcc-min()-X],
+				[tBodyAcc-min()-Y],
+				[tBodyAcc-min()-Z],
+				[tBodyAccJerk-mean()-X],
+				[tBodyAccJerk-mean()-Y],
+				[tBodyAccJerk-mean()-Z],
+				[tBodyAccJerk-max()-X],
+				[tBodyAccJerk-max()-Y],
+				[tBodyAccJerk-max()-Z],
+				[tBodyAccJerk-min()-X],
+				[tBodyAccJerk-min()-Y],
+				[tBodyAccJerk-min()-Z],
+				[tBodyGyro-mean()-X],
+				[tBodyGyro-mean()-Y],
+				[tBodyGyro-mean()-Z],
+				[tBodyGyro-max()-X],
+				[tBodyGyro-max()-Y],
+				[tBodyGyro-max()-Z],
+				[tBodyGyro-min()-X],
+				[tBodyGyro-min()-Y],
+				[tBodyGyro-min()-Z],
+				[tBodyGyroJerk-mean()-X],
+				[tBodyGyroJerk-mean()-Y],
+				[tBodyGyroJerk-mean()-Z],
+				[tBodyGyroJerk-max()-X],
+				[tBodyGyroJerk-max()-Y],
+				[tBodyGyroJerk-max()-Z],
+				[tBodyGyroJerk-min()-X],
+				[tBodyGyroJerk-min()-Y],
+				[tBodyGyroJerk-min()-Z],
+				[tBodyAccMag-mean()],
+				[tBodyAccMag-max()],
+				[tBodyAccMag-min()],
+				[tBodyAccJerkMag-mean()],
+				[tBodyAccJerkMag-max()],
+				[tBodyAccJerkMag-min()],
+				[tBodyGyroMag-mean()],
+				[tBodyGyroMag-max()],
+				[tBodyGyroMag-min()],
+				[tBodyGyroJerkMag-mean()],
+				[tBodyGyroJerkMag-max()],
+				[tBodyGyroJerkMag-min()],
+				[fBodyAcc-mean()-X],
+				[fBodyAcc-mean()-Y],
+				[fBodyAcc-mean()-Z],
+				[fBodyAcc-max()-X],
+				[fBodyAcc-max()-Y],
+				[fBodyAcc-max()-Z],
+				[fBodyAcc-min()-X],
+				[fBodyAcc-min()-Y],
+				[fBodyAcc-min()-Z],
+				[fBodyAccJerk-mean()-X],
+				[fBodyAccJerk-mean()-Y],
+				[fBodyAccJerk-mean()-Z],
+				[fBodyAccJerk-max()-X],
+				[fBodyAccJerk-max()-Y],
+				[fBodyAccJerk-max()-Z],
+				[fBodyAccJerk-min()-X],
+				[fBodyAccJerk-min()-Y],
+				[fBodyAccJerk-min()-Z],
+				[fBodyGyro-mean()-X],
+				[fBodyGyro-mean()-Y],
+				[fBodyGyro-mean()-Z],
+				[fBodyGyro-max()-X],
+				[fBodyGyro-max()-Y],
+				[fBodyGyro-max()-Z],
+				[fBodyGyro-min()-X],
+				[fBodyGyro-min()-Y],
+				[fBodyGyro-min()-Z],
+				[fBodyAccMag-mean()],
+				[fBodyAccMag-max()],
+				[fBodyAccMag-min()],
+				[fBodyBodyAccJerkMag-mean()],
+				[fBodyBodyAccJerkMag-max()],
+				[fBodyBodyAccJerkMag-min()],
+				[fBodyBodyGyroMag-mean()],
+				[fBodyBodyGyroMag-max()],
+				[fBodyBodyGyroMag-min()],
+				[fBodyBodyGyroJerkMag-mean()],
+				[fBodyBodyGyroJerkMag-max()],
+				[fBodyBodyGyroJerkMag-min()]
+			FROM
+				[activity-recognition-hub]
+		)
+		
+		SELECT
+			Features.*,
+			--[do-recognise-activity](Features) AS result
+			([do-recognise-activity](Features)).[Scored Labels] AS result
+		INTO
+			[My-Workspace]
+		FROM Features;
+	\end{lstlisting}
+
 
 \end{document}
