@@ -47,7 +47,7 @@
 	\maketitle
 	
 	\begin{abstract}
-		blah blah
+		EE5127 - Internet Of Things System Design Deliverable IIa and IIb written report. Covering the analysis of the dataset in use, experimentation with Machine Learning in Azure ML, deployment of an Azure ML model, and finally visualisation of data in Power BI.
 	\end{abstract}
 	
 	\begin{IEEEkeywords}
@@ -63,6 +63,8 @@
 	This dataset is chosen over other datasets, such as HARTH dataset \cite{logacjov2021harth} \cite{bach2021classifier} for its simplicity, requiring only 1 worn sensor. And for the simpler set of classifications, which correspond better with scenarios that would arise in a care facility or other healthcare setting.
 	
 	This paper aims to analyse and classify human activities using the UCI HAR dataset by developing and evaluating multiple machine learning models in Azure Machine Learning Studio. Power BI is employed to visualise data characteristics, feature distributions, and model performance metrics. The results provide insights into the use of sensor based data and machine learning in Human Activity Recognition.
+	
+	The paper will then additionally describe the steps to deploy and visualise an Azure ML model, which will receive data from an IoT device. 
 	
 	\section{Dataset Description}
 	
@@ -309,16 +311,16 @@
 	
 	In contrast, the full feature model achieved 92.8\% accuracy, showing that the engineered features available in the dataset significantly improve separability. Derived statistical, magnitude, and frequency domain attributes expose latent non-linear relationships that even a linear classifier like Logistic Regression can exploit. This demonstrates that well-designed feature extraction can compensate for model simplicity.
 	
-	The feature-selection experiments further confirmed this relationship. The Chi-Squared filter retained the most relevant subset of features, achieving 81.7\% accuracy—close to the full model but with much lower dimensionality. The Pearson correlation filter, limited to linear dependencies, performed poorly at 59.6\%. The Permutation Feature Importance method, evaluated using a Decision Forest, produced the highest overall accuracy (96.1\%), reflecting the capability of ensemble models to capture non-linear feature interactions without explicit feature engineering.
+	The feature-selection experiments further confirmed this relationship. The Chi-Squared filter retained the most relevant subset of features, achieving 81.7\% accuracy, close to the full model but with much lower dimensionality. The Pearson correlation filter, limited to linear dependencies, performed poorly at 59.6\%. The Permutation Feature Importance method, evaluated using a Decision Forest, produced the highest overall accuracy (96.1\%), reflecting the capability of ensemble models to capture non-linear feature interactions without explicit feature engineering.
 	
-	From an IoT system design perspective, these results highlight several key trade-offs:
+	From an IoT system design perspective, these results highlight several key trade offs:
 	\begin{itemize}
 		\item \textbf{Edge vs. Cloud Processing:} Lightweight models on raw sensor data achieve limited accuracy and are suitable only for coarse classification. More complex processing, including feature extraction and model inference, should be offloaded to a cloud platform or high-performance gateway to achieve reliable recognition.
 		\item \textbf{Feature Dimensionality:} While the full 99-feature model delivers high accuracy, feature selection can substantially reduce computation and bandwidth costs with minimal performance loss—important for constrained IoT deployments.
 		\item \textbf{Model Choice:} Linear models such as Logistic Regression are interpretable and efficient but limited in expressiveness. Non-linear models like Decision Forests or Neural Networks provide superior performance at the cost of higher computational load.
 	\end{itemize}
 	
-	Overall, the experiments demonstrate that high classification accuracy in Human Activity Recognition depends primarily on the availability of informative features. Combining moderate feature selection with non-linear classifiers offers an optimal balance between computational efficiency and predictive accuracy, aligning with the design goals of scalable IoT systems.
+	Overall, the experiments demonstrate that classification accuracy in Human Activity Recognition depends primarily on the availability of informative features. Combining moderate feature selection with non-linear classifiers offers an optimal balance between computational efficiency and predictive accuracy, aligning with the design goals of scalable IoT systems.
 
 	\section{Documentation of Web Service Deployment, Use, and Visualisation}
 	
@@ -367,7 +369,7 @@
 	
 	After creating the ASA job, it needs to be given an input to take in IoT device data, an output to send the data on to Power BI for visualisation, a function to query the REST API, and an SQL query to transfer the information from input to output while also including the function output. 
 	
-	First, create an input, ensure that IoT Hub is chosen as the input type, and give it a unique name. The creation window will look like Figure~\ref{fig:creating_input}. Give it a unique name and choose the IoT Hub that the IoT device is sending to.
+	First, create an input, ensure that \texttt{IoT Hub} is chosen as the input type, and give it a unique name. The creation window will look like Figure~\ref{fig:creating_input}. Give it a unique name, and then choose the IoT Hub that the IoT device is sending to.
 	
 	\begin{figure}[t]
 		\centering
@@ -385,7 +387,7 @@
 		\label{fig:function_creation}
 	\end{figure}
 	
-	Before completing the next task, create a workspace in Power BI, or take note of a workspace that is in use. Take note of the workspace name. Figure~\ref{fig:power_bi_workspace_creation} shows what the creation window looks like in Power BI.
+	Before completing the next task, create a workspace in Power BI. Take note of the workspace name. Figure~\ref{fig:power_bi_workspace_creation} shows what the creation window looks like in Power BI.
 	
 	Creating the workspace is necessary because Azure Stream Analytics writes its output directly into a Power BI dataset. The workspace selected determines where the real time dataset will appear and where the final visualisations will be built.
 	\begin{figure}[t]
@@ -421,6 +423,10 @@
 		\label{fig:asa_job}
 	\end{figure}
 	
+	Additionally, if storage is required, a blob storage can be added to the outputs section, this is done by choosing Azure blob storage instead when adding an output. The SQL query will also need to be updated to output to both the Power BI visualisation and the blob storage. 
+	
+	
+	
 	\subsection{Visualising in Power BI}
 	Once the IoT device has started transmitting, and the previous steps have been completed, the dataset specified will start receiving data in Power BI. 
 	
@@ -446,7 +452,7 @@
 	 
 	Now, various visuals for the data are available in the \texttt{Visualizations} tab. For this project, two \texttt{Line Chart}s and a \texttt{Card} are chosen. These can be dragged into the workspace. 
 	
-	For the \texttt{Line Chart}s, in the case of the data for this project, the \texttt{EventEnqueuedUtcTime} time was chosen for the X-axis for both charts. Then each chart displayed the X, Y and Z axes for Gyroscopic and Accelerometer Data respectively. To make the dashboard display the newest information, a filter was applied to both of these dashboard to only display data from the past minute. This was done by applying a filter, in the \texttt{Filters} tab, on \texttt{EventEnqueuedUtcTime} for both charts.
+	For the \texttt{Line Chart}s, in the case of the data for this project, the \texttt{EventEnqueuedUtcTime} time was chosen for the X-axis for both charts. Then each chart displayed the X, Y and Z axes for Gyroscopic and Accelerometer Data respectively. To make the dashboard display the newest information, rather than showing all historical data, a filter was applied to both of these dashboard to only display data from the past minute. This was done by applying a filter, in the \texttt{Filters} tab, on \texttt{EventEnqueuedUtcTime} for both charts.
 	
 	The \texttt{Card} was then used to display the last \texttt{activity\_label}, therefore displaying the current activity.
 	
@@ -457,7 +463,7 @@
 	\begin{figure}[t]
 		\centering
 		\includegraphics[width=\linewidth]{figures/power_bi_final_visual.png}
-		\caption{Final Power BI Visualisation}
+		\caption{Final Power BI Real Time Visualisation}
 		\label{fig:power_bi_visualisation}
 	\end{figure}
 	
@@ -513,219 +519,276 @@
 	
 	\section{Azure Stream Analytics job Query}\label{azure_sql}
 	\begin{lstlisting}[language=SQL]
-		WITH FeaturesWithTime AS (
-			SELECT
-				EventEnqueuedUtcTime,
-				activity,
-				[tBodyAcc-mean()-X],
-				[tBodyAcc-mean()-Y],
-				[tBodyAcc-mean()-Z],
-				[tBodyAcc-max()-X],
-				[tBodyAcc-max()-Y],
-				[tBodyAcc-max()-Z],
-				[tBodyAcc-min()-X],
-				[tBodyAcc-min()-Y],
-				[tBodyAcc-min()-Z],
-				[tBodyAccJerk-mean()-X],
-				[tBodyAccJerk-mean()-Y],
-				[tBodyAccJerk-mean()-Z],
-				[tBodyAccJerk-max()-X],
-				[tBodyAccJerk-max()-Y],
-				[tBodyAccJerk-max()-Z],
-				[tBodyAccJerk-min()-X],
-				[tBodyAccJerk-min()-Y],
-				[tBodyAccJerk-min()-Z],
-				[tBodyGyro-mean()-X],
-				[tBodyGyro-mean()-Y],
-				[tBodyGyro-mean()-Z],
-				[tBodyGyro-max()-X],
-				[tBodyGyro-max()-Y],
-				[tBodyGyro-max()-Z],
-				[tBodyGyro-min()-X],
-				[tBodyGyro-min()-Y],
-				[tBodyGyro-min()-Z],
-				[tBodyGyroJerk-mean()-X],
-				[tBodyGyroJerk-mean()-Y],
-				[tBodyGyroJerk-mean()-Z],
-				[tBodyGyroJerk-max()-X],
-				[tBodyGyroJerk-max()-Y],
-				[tBodyGyroJerk-max()-Z],
-				[tBodyGyroJerk-min()-X],
-				[tBodyGyroJerk-min()-Y],
-				[tBodyGyroJerk-min()-Z],
-				[tBodyAccMag-mean()],
-				[tBodyAccMag-max()],
-				[tBodyAccMag-min()],
-				[tBodyAccJerkMag-mean()],
-				[tBodyAccJerkMag-max()],
-				[tBodyAccJerkMag-min()],
-				[tBodyGyroMag-mean()],
-				[tBodyGyroMag-max()],
-				[tBodyGyroMag-min()],
-				[tBodyGyroJerkMag-mean()],
-				[tBodyGyroJerkMag-max()],
-				[tBodyGyroJerkMag-min()],
-				[fBodyAcc-mean()-X],
-				[fBodyAcc-mean()-Y],
-				[fBodyAcc-mean()-Z],
-				[fBodyAcc-max()-X],
-				[fBodyAcc-max()-Y],
-				[fBodyAcc-max()-Z],
-				[fBodyAcc-min()-X],
-				[fBodyAcc-min()-Y],
-				[fBodyAcc-min()-Z],
-				[fBodyAccJerk-mean()-X],
-				[fBodyAccJerk-mean()-Y],
-				[fBodyAccJerk-mean()-Z],
-				[fBodyAccJerk-max()-X],
-				[fBodyAccJerk-max()-Y],
-				[fBodyAccJerk-max()-Z],
-				[fBodyAccJerk-min()-X],
-				[fBodyAccJerk-min()-Y],
-				[fBodyAccJerk-min()-Z],
-				[fBodyGyro-mean()-X],
-				[fBodyGyro-mean()-Y],
-				[fBodyGyro-mean()-Z],
-				[fBodyGyro-max()-X],
-				[fBodyGyro-max()-Y],
-				[fBodyGyro-max()-Z],
-				[fBodyGyro-min()-X],
-				[fBodyGyro-min()-Y],
-				[fBodyGyro-min()-Z],
-				[fBodyAccMag-mean()],
-				[fBodyAccMag-max()],
-				[fBodyAccMag-min()],
-				[fBodyBodyAccJerkMag-mean()],
-				[fBodyBodyAccJerkMag-max()],
-				[fBodyBodyAccJerkMag-min()],
-				[fBodyBodyGyroMag-mean()],
-				[fBodyBodyGyroMag-max()],
-				[fBodyBodyGyroMag-min()],
-				[fBodyBodyGyroJerkMag-mean()],
-				[fBodyBodyGyroJerkMag-max()],
-				[fBodyBodyGyroJerkMag-min()]
-			FROM
-				[activity-recognition-hub]
-		),
-		
-		Features AS (
-			SELECT
-				activity,
-				[tBodyAcc-mean()-X],
-				[tBodyAcc-mean()-Y],
-				[tBodyAcc-mean()-Z],
-				[tBodyAcc-max()-X],
-				[tBodyAcc-max()-Y],
-				[tBodyAcc-max()-Z],
-				[tBodyAcc-min()-X],
-				[tBodyAcc-min()-Y],
-				[tBodyAcc-min()-Z],
-				[tBodyAccJerk-mean()-X],
-				[tBodyAccJerk-mean()-Y],
-				[tBodyAccJerk-mean()-Z],
-				[tBodyAccJerk-max()-X],
-				[tBodyAccJerk-max()-Y],
-				[tBodyAccJerk-max()-Z],
-				[tBodyAccJerk-min()-X],
-				[tBodyAccJerk-min()-Y],
-				[tBodyAccJerk-min()-Z],
-				[tBodyGyro-mean()-X],
-				[tBodyGyro-mean()-Y],
-				[tBodyGyro-mean()-Z],
-				[tBodyGyro-max()-X],
-				[tBodyGyro-max()-Y],
-				[tBodyGyro-max()-Z],
-				[tBodyGyro-min()-X],
-				[tBodyGyro-min()-Y],
-				[tBodyGyro-min()-Z],
-				[tBodyGyroJerk-mean()-X],
-				[tBodyGyroJerk-mean()-Y],
-				[tBodyGyroJerk-mean()-Z],
-				[tBodyGyroJerk-max()-X],
-				[tBodyGyroJerk-max()-Y],
-				[tBodyGyroJerk-max()-Z],
-				[tBodyGyroJerk-min()-X],
-				[tBodyGyroJerk-min()-Y],
-				[tBodyGyroJerk-min()-Z],
-				[tBodyAccMag-mean()],
-				[tBodyAccMag-max()],
-				[tBodyAccMag-min()],
-				[tBodyAccJerkMag-mean()],
-				[tBodyAccJerkMag-max()],
-				[tBodyAccJerkMag-min()],
-				[tBodyGyroMag-mean()],
-				[tBodyGyroMag-max()],
-				[tBodyGyroMag-min()],
-				[tBodyGyroJerkMag-mean()],
-				[tBodyGyroJerkMag-max()],
-				[tBodyGyroJerkMag-min()],
-				[fBodyAcc-mean()-X],
-				[fBodyAcc-mean()-Y],
-				[fBodyAcc-mean()-Z],
-				[fBodyAcc-max()-X],
-				[fBodyAcc-max()-Y],
-				[fBodyAcc-max()-Z],
-				[fBodyAcc-min()-X],
-				[fBodyAcc-min()-Y],
-				[fBodyAcc-min()-Z],
-				[fBodyAccJerk-mean()-X],
-				[fBodyAccJerk-mean()-Y],
-				[fBodyAccJerk-mean()-Z],
-				[fBodyAccJerk-max()-X],
-				[fBodyAccJerk-max()-Y],
-				[fBodyAccJerk-max()-Z],
-				[fBodyAccJerk-min()-X],
-				[fBodyAccJerk-min()-Y],
-				[fBodyAccJerk-min()-Z],
-				[fBodyGyro-mean()-X],
-				[fBodyGyro-mean()-Y],
-				[fBodyGyro-mean()-Z],
-				[fBodyGyro-max()-X],
-				[fBodyGyro-max()-Y],
-				[fBodyGyro-max()-Z],
-				[fBodyGyro-min()-X],
-				[fBodyGyro-min()-Y],
-				[fBodyGyro-min()-Z],
-				[fBodyAccMag-mean()],
-				[fBodyAccMag-max()],
-				[fBodyAccMag-min()],
-				[fBodyBodyAccJerkMag-mean()],
-				[fBodyBodyAccJerkMag-max()],
-				[fBodyBodyAccJerkMag-min()],
-				[fBodyBodyGyroMag-mean()],
-				[fBodyBodyGyroMag-max()],
-				[fBodyBodyGyroMag-min()],
-				[fBodyBodyGyroJerkMag-mean()],
-				[fBodyBodyGyroJerkMag-max()],
-				[fBodyBodyGyroJerkMag-min()]
-			FROM
-				FeaturesWithTime
-		)
-		
+	-- This will include device data and the enqueued time.
+	WITH FeaturesWithTime AS (
 		SELECT
-			FWT.EventEnqueuedUtcTime,
-			FWT.[tBodyAcc-mean()-X],
-			FWT.[tBodyAcc-mean()-Y],
-			FWT.[tBodyAcc-mean()-Z],
-			FWT.[tBodyAccJerk-mean()-X],
-			FWT.[tBodyGyro-mean()-X],
-			FWT.[tBodyGyro-mean()-Y],
-			FWT.[tBodyGyro-mean()-Z],
-			FWT.[tBodyAccMag-mean()],
-			FWT.[tBodyAccMag-max()],
-			FWT.[tBodyGyroMag-mean()],
-			FWT.[fBodyAcc-mean()-X],
-			FWT.[fBodyAcc-mean()-Y],
-			FWT.[fBodyAcc-mean()-Z],
-			FWT.[fBodyAccJerk-mean()-X],
-			FWT.[fBodyGyro-mean()-X],
-			FWT.[fBodyBodyGyroMag-mean()],
-			FWT.[fBodyAccMag-mean()],
-			FWT.[fBodyBodyGyroJerkMag-mean()],
+			EventEnqueuedUtcTime,
+			activity,
+			[tBodyAcc-mean()-X],
+			[tBodyAcc-mean()-Y],
+			[tBodyAcc-mean()-Z],
+			[tBodyAcc-max()-X],
+			[tBodyAcc-max()-Y],
+			[tBodyAcc-max()-Z],
+			[tBodyAcc-min()-X],
+			[tBodyAcc-min()-Y],
+			[tBodyAcc-min()-Z],
+			[tBodyAccJerk-mean()-X],
+			[tBodyAccJerk-mean()-Y],
+			[tBodyAccJerk-mean()-Z],
+			[tBodyAccJerk-max()-X],
+			[tBodyAccJerk-max()-Y],
+			[tBodyAccJerk-max()-Z],
+			[tBodyAccJerk-min()-X],
+			[tBodyAccJerk-min()-Y],
+			[tBodyAccJerk-min()-Z],
+			[tBodyGyro-mean()-X],
+			[tBodyGyro-mean()-Y],
+			[tBodyGyro-mean()-Z],
+			[tBodyGyro-max()-X],
+			[tBodyGyro-max()-Y],
+			[tBodyGyro-max()-Z],
+			[tBodyGyro-min()-X],
+			[tBodyGyro-min()-Y],
+			[tBodyGyro-min()-Z],
+			[tBodyGyroJerk-mean()-X],
+			[tBodyGyroJerk-mean()-Y],
+			[tBodyGyroJerk-mean()-Z],
+			[tBodyGyroJerk-max()-X],
+			[tBodyGyroJerk-max()-Y],
+			[tBodyGyroJerk-max()-Z],
+			[tBodyGyroJerk-min()-X],
+			[tBodyGyroJerk-min()-Y],
+			[tBodyGyroJerk-min()-Z],
+			[tBodyAccMag-mean()],
+			[tBodyAccMag-max()],
+			[tBodyAccMag-min()],
+			[tBodyAccJerkMag-mean()],
+			[tBodyAccJerkMag-max()],
+			[tBodyAccJerkMag-min()],
+			[tBodyGyroMag-mean()],
+			[tBodyGyroMag-max()],
+			[tBodyGyroMag-min()],
+			[tBodyGyroJerkMag-mean()],
+			[tBodyGyroJerkMag-max()],
+			[tBodyGyroJerkMag-min()],
+			[fBodyAcc-mean()-X],
+			[fBodyAcc-mean()-Y],
+			[fBodyAcc-mean()-Z],
+			[fBodyAcc-max()-X],
+			[fBodyAcc-max()-Y],
+			[fBodyAcc-max()-Z],
+			[fBodyAcc-min()-X],
+			[fBodyAcc-min()-Y],
+			[fBodyAcc-min()-Z],
+			[fBodyAccJerk-mean()-X],
+			[fBodyAccJerk-mean()-Y],
+			[fBodyAccJerk-mean()-Z],
+			[fBodyAccJerk-max()-X],
+			[fBodyAccJerk-max()-Y],
+			[fBodyAccJerk-max()-Z],
+			[fBodyAccJerk-min()-X],
+			[fBodyAccJerk-min()-Y],
+			[fBodyAccJerk-min()-Z],
+			[fBodyGyro-mean()-X],
+			[fBodyGyro-mean()-Y],
+			[fBodyGyro-mean()-Z],
+			[fBodyGyro-max()-X],
+			[fBodyGyro-max()-Y],
+			[fBodyGyro-max()-Z],
+			[fBodyGyro-min()-X],
+			[fBodyGyro-min()-Y],
+			[fBodyGyro-min()-Z],
+			[fBodyAccMag-mean()],
+			[fBodyAccMag-max()],
+			[fBodyAccMag-min()],
+			[fBodyBodyAccJerkMag-mean()],
+			[fBodyBodyAccJerkMag-max()],
+			[fBodyBodyAccJerkMag-min()],
+			[fBodyBodyGyroMag-mean()],
+			[fBodyBodyGyroMag-max()],
+			[fBodyBodyGyroMag-min()],
+			[fBodyBodyGyroJerkMag-mean()],
+			[fBodyBodyGyroJerkMag-max()],
+			[fBodyBodyGyroJerkMag-min()]
+		FROM
+			[activity-recognition-hub]
+	),
+	-- This will be passed into the function.
+	Features AS (
+		SELECT
+			activity,
+			[tBodyAcc-mean()-X],
+			[tBodyAcc-mean()-Y],
+			[tBodyAcc-mean()-Z],
+			[tBodyAcc-max()-X],
+			[tBodyAcc-max()-Y],
+			[tBodyAcc-max()-Z],
+			[tBodyAcc-min()-X],
+			[tBodyAcc-min()-Y],
+			[tBodyAcc-min()-Z],
+			[tBodyAccJerk-mean()-X],
+			[tBodyAccJerk-mean()-Y],
+			[tBodyAccJerk-mean()-Z],
+			[tBodyAccJerk-max()-X],
+			[tBodyAccJerk-max()-Y],
+			[tBodyAccJerk-max()-Z],
+			[tBodyAccJerk-min()-X],
+			[tBodyAccJerk-min()-Y],
+			[tBodyAccJerk-min()-Z],
+			[tBodyGyro-mean()-X],
+			[tBodyGyro-mean()-Y],
+			[tBodyGyro-mean()-Z],
+			[tBodyGyro-max()-X],
+			[tBodyGyro-max()-Y],
+			[tBodyGyro-max()-Z],
+			[tBodyGyro-min()-X],
+			[tBodyGyro-min()-Y],
+			[tBodyGyro-min()-Z],
+			[tBodyGyroJerk-mean()-X],
+			[tBodyGyroJerk-mean()-Y],
+			[tBodyGyroJerk-mean()-Z],
+			[tBodyGyroJerk-max()-X],
+			[tBodyGyroJerk-max()-Y],
+			[tBodyGyroJerk-max()-Z],
+			[tBodyGyroJerk-min()-X],
+			[tBodyGyroJerk-min()-Y],
+			[tBodyGyroJerk-min()-Z],
+			[tBodyAccMag-mean()],
+			[tBodyAccMag-max()],
+			[tBodyAccMag-min()],
+			[tBodyAccJerkMag-mean()],
+			[tBodyAccJerkMag-max()],
+			[tBodyAccJerkMag-min()],
+			[tBodyGyroMag-mean()],
+			[tBodyGyroMag-max()],
+			[tBodyGyroMag-min()],
+			[tBodyGyroJerkMag-mean()],
+			[tBodyGyroJerkMag-max()],
+			[tBodyGyroJerkMag-min()],
+			[fBodyAcc-mean()-X],
+			[fBodyAcc-mean()-Y],
+			[fBodyAcc-mean()-Z],
+			[fBodyAcc-max()-X],
+			[fBodyAcc-max()-Y],
+			[fBodyAcc-max()-Z],
+			[fBodyAcc-min()-X],
+			[fBodyAcc-min()-Y],
+			[fBodyAcc-min()-Z],
+			[fBodyAccJerk-mean()-X],
+			[fBodyAccJerk-mean()-Y],
+			[fBodyAccJerk-mean()-Z],
+			[fBodyAccJerk-max()-X],
+			[fBodyAccJerk-max()-Y],
+			[fBodyAccJerk-max()-Z],
+			[fBodyAccJerk-min()-X],
+			[fBodyAccJerk-min()-Y],
+			[fBodyAccJerk-min()-Z],
+			[fBodyGyro-mean()-X],
+			[fBodyGyro-mean()-Y],
+			[fBodyGyro-mean()-Z],
+			[fBodyGyro-max()-X],
+			[fBodyGyro-max()-Y],
+			[fBodyGyro-max()-Z],
+			[fBodyGyro-min()-X],
+			[fBodyGyro-min()-Y],
+			[fBodyGyro-min()-Z],
+			[fBodyAccMag-mean()],
+			[fBodyAccMag-max()],
+			[fBodyAccMag-min()],
+			[fBodyBodyAccJerkMag-mean()],
+			[fBodyBodyAccJerkMag-max()],
+			[fBodyBodyAccJerkMag-min()],
+			[fBodyBodyGyroMag-mean()],
+			[fBodyBodyGyroMag-max()],
+			[fBodyBodyGyroMag-min()],
+			[fBodyBodyGyroJerkMag-mean()],
+			[fBodyBodyGyroJerkMag-max()],
+			[fBodyBodyGyroJerkMag-min()]
+		FROM
+			FeaturesWithTime
+	),
+	
+	-- To call the function and get the ML prediction
+	Scored AS (
+		SELECT
+			FWT.*,
 			([do-recognise-activity](F)).[Scored Labels] AS result
-		INTO [My-Workspace]
-			FROM FeaturesWithTime FWT
-		JOIN Features F ON DATEDIFF(second, FWT, F) BETWEEN 0 AND 1;
+		FROM FeaturesWithTime FWT
+		JOIN Features F
+		ON DATEDIFF(second, FWT, F) BETWEEN 0 AND 1
+	)
+	
+	-- Send to Power BI
+	SELECT
+		-- Power BI only supports 75 rows.
+		Scored.EventEnqueuedUtcTime, 
+		Scored.[tBodyAcc-mean()-X], 
+		Scored.[tBodyAcc-mean()-Y], 
+		Scored.[tBodyAcc-mean()-Z], 
+		Scored.[tBodyAccJerk-mean()-X], 
+		Scored.[tBodyGyro-mean()-X], 
+		Scored.[tBodyGyro-mean()-Y], 
+		Scored.[tBodyGyro-mean()-Z], 
+		Scored.[tBodyAccMag-mean()], 
+		Scored.[tBodyAccMag-max()], 
+		Scored.[tBodyGyroMag-mean()], 
+		Scored.[fBodyAcc-mean()-X], 
+		Scored.[fBodyAcc-mean()-Y], 
+		Scored.[fBodyAcc-mean()-Z], 
+		Scored.[fBodyAccJerk-mean()-X], 
+		Scored.[fBodyGyro-mean()-X], 
+		Scored.[fBodyBodyGyroMag-mean()], 
+		Scored.[fBodyAccMag-mean()], 
+		Scored.[fBodyBodyGyroJerkMag-mean()],
+		result as numerical_label,
+		CASE result
+			WHEN 1 THEN 'Walking'
+			WHEN 2 THEN 'Walking Upstairs'
+			WHEN 3 THEN 'Walking Downstairs'
+			WHEN 4 THEN 'Sitting'
+			WHEN 5 THEN 'Standing'
+			WHEN 6 THEN 'Laying'
+			ELSE 'Unknown'
+		END AS result_label
+	INTO [My-Workspace]
+	FROM Scored;
+	
+	-- Send to Azure Blob storage
+	SELECT
+		Scored.EventEnqueuedUtcTime, 
+		Scored.[tBodyAcc-mean()-X], 
+		Scored.[tBodyAcc-mean()-Y], 
+		Scored.[tBodyAcc-mean()-Z], 
+		Scored.[tBodyAccJerk-mean()-X], 
+		Scored.[tBodyGyro-mean()-X], 
+		Scored.[tBodyGyro-mean()-Y], 
+		Scored.[tBodyGyro-mean()-Z], 
+		Scored.[tBodyAccMag-mean()], 
+		Scored.[tBodyAccMag-max()], 
+		Scored.[tBodyGyroMag-mean()], 
+		Scored.[fBodyAcc-mean()-X], 
+		Scored.[fBodyAcc-mean()-Y], 
+		Scored.[fBodyAcc-mean()-Z], 
+		Scored.[fBodyAccJerk-mean()-X], 
+		Scored.[fBodyGyro-mean()-X], 
+		Scored.[fBodyBodyGyroMag-mean()], 
+		Scored.[fBodyAccMag-mean()], 
+		Scored.[fBodyBodyGyroJerkMag-mean()],
+		result as numerical_label,
+		CASE result
+			WHEN 1 THEN 'Walking'
+			WHEN 2 THEN 'Walking Upstairs'
+			WHEN 3 THEN 'Walking Downstairs'
+			WHEN 4 THEN 'Sitting'
+			WHEN 5 THEN 'Standing'
+			WHEN 6 THEN 'Laying'
+			ELSE 'Unknown'
+		END AS result_label
+	INTO
+		[iot-output-blob]
+	FROM
+		Scored;
 	\end{lstlisting}
 
 
